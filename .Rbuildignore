@@ -1,3 +1,10 @@
 ^f1model\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
+^\.github$
+^CODE_OF_CONDUCT\.md$
+^README\.Rmd$
+^codecov\.yml$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
