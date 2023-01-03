@@ -27,12 +27,14 @@ getWeather <- function(race_url){
     }
 
   }, error = function(e) {
-    message(glue::glue("Error in f1model:::getWeather: {err}", err=e))
+    message(glue::glue("Error in f1model:::getWeather: {url} - {err}",
+                       url = race_url, err=e))
   })
 
   if(is.null(race_weather)){
     #Try the italian site - it's apparently more robust
-    message("f1model:::getWeather: Trying to get weather from Italian Wikipedia")
+    message(glue::glue("f1model:::getWeather: Trying to get weather from Italian Wikipedia instead of {url}",
+                       url=race_url))
     it_url = grep(pattern = "https:\\/\\/it.wikipedia.org\\/wiki\\/[a-zA-Z0-9_%]*",
                  x = RCurl::getURLContent(race_url,
                                           .opts = list(ssl.verifypeer = FALSE)),
@@ -49,7 +51,8 @@ getWeather <- function(race_url){
       }
 
     }, error = function(e) {
-      message(glue::glue("Error in f1model:::getWeather: {err}", err=e))
+      message(glue::glue("Error in f1model:::getWeather: {url} - {err}",
+                         url = race_url, err=e))
     })
   }
 
@@ -68,7 +71,8 @@ getWeather <- function(race_url){
   } else if (grepl("soleggiato|clear|warm|hot|sunny|fine|mild|sereno", race_weather, ignore.case = T)){
     race_weather <- 'warm'
   } else {
-    message(glue::glue("f1model:::getWeather: Race Weather of {race_weather} is unknown type.", race_weather=race_weather))
+    message(glue::glue("f1model:::getWeather: Race Weather of {race_weather} is unknown type. From {url}",
+                       race_weather=race_weather, url=race_url))
     race_weather <- 'unknown'
   }
 

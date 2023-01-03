@@ -7,7 +7,7 @@
 getWeather(race_url)
 }
 \arguments{
-\item{race_url}{a wikipedia url}
+\item{race_url}{a wikipedia url for a grand prix (in english)}
 }
 \value{
 a weather, as character (one of \code{warm}, \code{cold}, \code{dry}, \code{wet}, or \code{cloudy})
