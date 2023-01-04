@@ -7,6 +7,7 @@
 \format{
 a data frame with the following columns:
 \itemize{
+\item raceId (numeric)
 \item year (numeric)
 \item round (numeric)
 \item circuitId (corresponding to a circuitId in circuits, numeric)

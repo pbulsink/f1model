@@ -25,3 +25,5 @@ Suggests:
 Config/testthat/edition: 3
 URL: https://pbulsink.github.io/f1model/
 LazyData: true
+Depends: 
+    R (>= 2.10)
