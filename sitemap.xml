@@ -19,6 +19,12 @@
     <loc>https://pbulsink.github.io/f1model/index.html</loc>
   </url>
   <url>
+    <loc>https://pbulsink.github.io/f1model/reference/circuits.html</loc>
+  </url>
+  <url>
+    <loc>https://pbulsink.github.io/f1model/reference/drivers.html</loc>
+  </url>
+  <url>
     <loc>https://pbulsink.github.io/f1model/reference/getWeather.html</loc>
   </url>
   <url>
@@ -26,5 +32,14 @@
   </url>
   <url>
     <loc>https://pbulsink.github.io/f1model/reference/pipe.html</loc>
+  </url>
+  <url>
+    <loc>https://pbulsink.github.io/f1model/reference/races.html</loc>
+  </url>
+  <url>
+    <loc>https://pbulsink.github.io/f1model/reference/results.html</loc>
+  </url>
+  <url>
+    <loc>https://pbulsink.github.io/f1model/reference/safety_cars.html</loc>
   </url>
 </urlset>
