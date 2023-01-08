@@ -34,9 +34,12 @@
 #' - lat (latitude, numeric)
 #' - lng (longditude, numeric)
 #' - alt (altitude, numeric)
+#' - length (km, numeric)
+#' - type (street, race or road, character)
+#' - direction (clockwise or anti-clockwise)
 #' - url (to wikipedia, character)
 #'
-#' @source http://ergast.com/api/f1/circuits, with additions
+#' @source http://ergast.com/api/f1/circuits, with additions from wikipedia, others
 "circuits"
 
 #' Safety Cars
