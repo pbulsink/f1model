@@ -19,7 +19,7 @@ a data frame with the following columns:
 }
 }
 \source{
-http://ergast.com/api/f1/circuits
+http://ergast.com/api/f1/circuits, with additions
 }
 \usage{
 circuits

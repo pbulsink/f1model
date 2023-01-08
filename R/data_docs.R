@@ -36,7 +36,7 @@
 #' - alt (altitude, numeric)
 #' - url (to wikipedia, character)
 #'
-#' @source http://ergast.com/api/f1/circuits
+#' @source http://ergast.com/api/f1/circuits, with additions
 "circuits"
 
 #' Safety Cars
@@ -86,8 +86,23 @@
 #' - nationality (character)
 #' - url (to wikipedia)
 #'
-#' @source https://ergast.com/api/f1/drivers
+#' @source https://ergast.com/api/f1/drivers, with additions
 "drivers"
+
+#' Constructors
+#'
+#' @description a list of constructors, nationalities, and urls
+#'
+#' @format a data frame with the following columns:
+#' - constructorId (unique Id, numeric)
+#' - constructorRef (a unique Id, character)
+#' - name (character)
+#' - nationality (character)
+#' - url (wikipedia url, character)
+#'
+#' @source https://ergast.com/api/f1/constructors
+"constructors"
+
 #' Practices
 #'
 #' @description a list of practice results from 2000 onward

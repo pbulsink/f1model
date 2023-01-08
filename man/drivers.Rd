@@ -19,7 +19,7 @@ a data frame with the following columns:
 }
 }
 \source{
-https://ergast.com/api/f1/drivers
+https://ergast.com/api/f1/drivers, with additions
 }
 \usage{
 drivers
