@@ -149,7 +149,7 @@ getRacePractices<-function(raceId){
     Sys.sleep(5)
   }
   if (nrow(practice_data) == 0){
-    # Qatar 2021 (raceId = 1051) has no data on f1.com
+    # Qatar 2021 (raceId = 1051) has no data on f1.com, maybe others too?
     practice_data$f1RaceId <- character()
     practice_data$raceId <- practice_data$year <- practice_data$round <- integer()
     practice_data$driverId <- practice_data$constructorId <- integer()

@@ -17,4 +17,7 @@ test_that("Practice Download Works", {
                                      "driverCode", "driverCar", "time", "gap",
                                      "laps", "practiceNum", "raceId", "f1RaceId",
                                      "year", "round", "driverId", "constructorId"))
+  p0<-getRacePractices(1051)
+  expect_equal(nrow(p0), 0)
+  expect_equal(ncol(practice), ncol(p0))
 })
