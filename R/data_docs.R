@@ -125,3 +125,51 @@
 #'
 #' @source f1.com
 "practices"
+
+#' Pit Stops
+#'
+#' @description a list of pit stops from 2011 onward
+#'
+#' @format A data frame with the following columns:
+#' - raceId (see `races`, integer)
+#' - driverId (see `drivers`, integer)
+#' - stop (which stop number for that driver that race, integer)
+#' - lap (lap on which the driver came in to the pits, integer)
+#' - time (clock time of the pit entry, character)
+#' - duration (duration of the pit stop from pit entry to exit, numeric)
+#' - millisecond (duration fo the pit stop in milliseconds, integer)
+#'
+#' @source https://ergast.com/api/f1/pit_stops
+"pit_stops"
+
+#' Driver Standings
+#'
+#' @description a list of drivers' standings at the end of every race
+#'
+#' @format A data frame with the following columns:
+#' - driverStandingsId (key, integer)
+#' - raceId (see `races`, integer)
+#' - driverId (see `drivers`, integer)
+#' - points (numeric)
+#' - position (ranking at that point in the season, numeric)
+#' - positionText (ranking at that point in the season, character)
+#' - wins (number of wins that season, integer)
+#'
+#' @source https://ergast.com/api/f1/standings
+"driver_standings"
+
+#' Constructor Standings
+#'
+#' @description a list of drivers' standings at the end of every race
+#'
+#' @format A data frame with the following columns:
+#' - constructorStandingsId (key, integer)
+#' - raceId (see `races`, integer)
+#' - constructorId (see `constructors`, integer)
+#' - points (numeric)
+#' - position (ranking at that point in the season, numeric)
+#' - positionText (ranking at that point in the season, character)
+#' - wins (number of wins that season, integer)
+#'
+#' @source https://ergast.com/api/f1/standings
+"constructor_standings"
