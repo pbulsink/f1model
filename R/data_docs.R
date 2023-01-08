@@ -88,3 +88,25 @@
 #'
 #' @source https://ergast.com/api/f1/drivers
 "drivers"
+#' Practices
+#'
+#' @description a list of practice results from 2000 onward
+#'
+#' @format a data frame with the following columns:
+#' - position (finishing position in practice, integer)
+#' - driverNum (drivers' racing number (e.g. Hamilton = 44), integer)
+#' - driverName (drivers' name, character)
+#' - driverCar (drivers' car name, character)
+#' - time (fastest lap, character)
+#' - gap (gap to leader, character)
+#' - laps (number of laps, integer)
+#' - practiceNum (practice number, 1 through 4, integer)
+#' - raceId (race Id, see `races`, integer)
+#' - f1RaceId (race reference code, see `races`, character)
+#' - year (year, integer)
+#' - round (round number, integer)
+#' - driverId (driver reference code, see `drivers`, integer)
+#' - constructorId (constructor reference code, see `constructors`, integer)
+#'
+#' @source f1.com
+"practices"

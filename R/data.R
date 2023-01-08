@@ -80,7 +80,6 @@ getWeather <- function(race_url){
 }
 
 getPracticeTimes<-function(f1RaceId, year, practiceNum){
-  practice_results<-data.frame()
   practice_url<-glue::glue("https://www.formula1.com/en/results.html/{year}/races/{id}/practice-{num}.html",
                   year = year, id = f1RaceId, num = practiceNum)
   practice_table<-NA
@@ -95,19 +94,24 @@ getPracticeTimes<-function(f1RaceId, year, practiceNum){
       #There was likely an issue with the f1RaceId value
       stop(glue::glue("There seems to be no race Id {raceid}, {url} returns season results for {year}.",
                       raceid=f1RaceId, url = practice_url, year = year))
-    } else {
+    } else if (nrow(practice_table)>0){
       #hopefully all ok?
       practice_table <- practice_table %>%
         dplyr::select(c("Pos", "No", "Driver", "Car", "Time", "Gap", "Laps"))
+      #reformat driver name/code field
       practice_table$Driver = gsub("\\n", "", practice_table$Driver)
       practice_table$Driver = gsub("\\s+", " ", practice_table$Driver)
+
       colnames(practice_table) <- c("position", "driverNum", "driverName",
                                     "driverCar", "time", "gap", "laps")
 
+      #split driver code from name
       practice_table$driverCode<-substr(x = practice_table$driverName, nchar(practice_table$driverName)-2, nchar(practice_table$driverName))
       practice_table$driverName<-substr(x = practice_table$driverName, 0, nchar(practice_table$driverName)-4)
       practice_table$practiceNum <- practiceNum
       practice_table$time <- as.character(practice_table$time)
+    } else {
+      practice_table <- NA
     }
 
   }, error = function(e) {
@@ -119,7 +123,7 @@ getPracticeTimes<-function(f1RaceId, year, practiceNum){
 
 getRacePractices<-function(raceId){
   #inherently, we're not getting data for races with NA as f1RaceId
-  rs<-races[!is.na(races$f1RaceId),]
+  rs<-f1model::races[!is.na(f1model::races$f1RaceId),]
   stopifnot(!is.na(rs[rs$raceId == raceId,]$f1RaceId))
 
   #get practices
@@ -144,14 +148,21 @@ getRacePractices<-function(raceId){
     }
     Sys.sleep(5)
   }
+  if (nrow(practice_data) == 0){
+    # Qatar 2021 (raceId = 1051) has no data on f1.com
+    practice_data$f1RaceId <- character()
+    practice_data$raceId <- practice_data$year <- practice_data$round <- integer()
+    practice_data$driverId <- practice_data$constructorId <- integer()
+    return(practice_data)
+  }
   practice_data$raceId <- raceId
   practice_data$f1RaceId <- rs[rs$raceId == raceId, ]$f1RaceId
   practice_data$year <- rs[rs$raceId == raceId,]$year
   practice_data$round <- rs[rs$raceId == raceId,]$round
 
   #add driver/constructor lookups
-  driverConstructor <- results[results$raceId == raceId,
-                               c("driverId", "constructorId")]
+  driverConstructor <- f1model::results[f1model::results$raceId == raceId,
+                                        c("driverId", "constructorId")]
 
   practice_data$driverId <- NA
   practice_data$constructorId <- NA
@@ -182,7 +193,7 @@ getRacePractices<-function(raceId){
     } else if (code == "PAN"){
       driverId <- ifelse(practice_data[i,]$driverName == "Olivier Panis", 44, 45)
     } else {
-      driverId <- drivers[drivers$code == code,]$driverId
+      driverId <- f1model::drivers[f1model::drivers$code == code,]$driverId
     }
 
     if(length(driverId) != 0){
@@ -235,6 +246,7 @@ getRacePractices<-function(raceId){
         grepl("caterham", const, ignore.case = T) ~ 207,
         grepl("marussia", const, ignore.case = T) ~ 206,
         grepl("lotus mercedes", const, ignore.case = T) ~ 208,
+        grepl("lotus renault", const, ignore.case = T) ~ 208,
         TRUE ~ NA_real_)
       if(is.na(practice_data[i, ]$constructorId)){
         message(glue::glue("Found Unknown driverCar: {car} for Driver {driver} in raceId: {race}",
