@@ -176,3 +176,19 @@
 #'
 #' @source https://ergast.com/api/f1/standings
 "constructor_standings"
+
+#' Qualifying Results
+#'
+#' @description a list of qualifying results by race
+#'
+#' @format a data frame with the following columns:
+#' - qualifyId (key, integer)
+#' - raceId (see `races`, integer)
+#' - driverId (see `drivers`, integer)
+#' - constructorId (see `constructors`, integer)
+#' - number (driver number, integer)
+#' - position (finishing position, integer)
+#' - q1, q2, q3 (qualifying lap times, character)
+#'
+#' @source https://ergast.com/api/f1/qualifying
+"qualifying"
