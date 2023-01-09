@@ -15,11 +15,14 @@ a data frame with the following columns:
 \item lat (latitude, numeric)
 \item lng (longditude, numeric)
 \item alt (altitude, numeric)
+\item length (km, numeric)
+\item type (street, race or road, character)
+\item direction (clockwise or anti-clockwise)
 \item url (to wikipedia, character)
 }
 }
 \source{
-http://ergast.com/api/f1/circuits, with additions
+http://ergast.com/api/f1/circuits, with additions from wikipedia, others
 }
 \usage{
 circuits

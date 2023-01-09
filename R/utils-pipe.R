@@ -12,3 +12,13 @@
 #' @param rhs A function call using the magrittr semantics.
 #' @return The result of calling `rhs(lhs)`.
 NULL
+
+#' .data
+#'
+#' See \code{rlang::\link[rlang:dot-data]{.data}} for details.
+#'
+#' @name .data
+#' @keywords internal
+#' @export
+#' @importFrom rlang .data
+NULL

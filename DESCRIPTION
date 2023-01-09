@@ -16,6 +16,7 @@ Imports:
     glue,
     magrittr,
     RCurl,
+    rlang,
     rvest
 Remotes:
     SCasanova/f1dataR

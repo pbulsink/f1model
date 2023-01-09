@@ -258,3 +258,73 @@ getRacePractices<-function(raceId){
 
   return(practice_data)
 }
+
+combineData <- function(){
+  # This function combines the data from the saved data sets to one
+  # useful data frame for modelling. It also includes reprocessing
+  # steps.
+
+  # -------- Driver Standings -------------------------
+  driver_standings <- f1model::driver_standings
+
+  # -------- Constructor Standings --------------------
+  constructor_standings <- f1model::constructor_standings
+
+  # -------- Practices --------------------------------
+  practices <- f1model::practices
+  practices$practiceTimeSec <- timeToSec(practices$time)
+  practices$practiceGapSec <- timeToSec(practices$gap)
+  practices <- practices %>%
+    dplyr::group_by(.data$raceId, .data$practiceNum) %>%
+    dplyr::mutate("practiceTimePerc" = .data$practiceTimeSec/min(.data$practiceTimeSec)) %>%
+    dplyr::ungroup() %>%
+    dplyr::group_by(.data$raceId, .data$driverId) %>%
+    dplyr::mutate("driverPracticeAvgSec" = mean(.data$practiceTimeSec),
+                  "driverPracticeAvgPerc" = mean(.data$practiceTimePerc)) %>%
+    dplyr::ungroup() %>%
+    dplyr::group_by(.data$raceId, .data$constructorId) %>%
+    dplyr::mutate("constructorPracticeAvgSec" = mean(.data$practiceTimeSec),
+                  "constructorPracticeAvgPerc" = mean(.data$practiceTimePerc)) %>%
+    dplyr::ungroup() %>%
+    dplyr::group_by(.data$raceId, .data$practiceNum) %>%
+    dplyr::mutate("driverTeamPracticeGapSec" = .data$practiceTimeSec - .data$constructorPracticeAvgSec,
+                  "driverTeamPracticeGapPerc" = .data$practiceTimeSec / .data$constructorPracticeAvgSec) %>%
+    dplyr::ungroup() %>%
+    dplyr::group_by(.data$raceId, .data$driverId) %>%
+    dplyr::mutate("driverTeamPracticeAvgGapSec" = mean(.data$driverTeamPracticeGapSec),
+                  "driverTeamPracticeAvgGapPerc" = mean(.data$driverTeamPracticeGapPerc)) %>%
+    dplyr::ungroup()
+
+
+  # -------- Quali ------------------------------------
+  quali<- f1model::qualifying
+  quali[quali$q1 == "\\N",]$q1 <- NA
+  quali$q1Sec <- timeToSec(quali$q1)
+  quali[quali$q2 == "\\N",]$q2 <- NA
+  quali$q2Sec <- timeToSec(quali$q2)
+  quali[quali$q3 == "\\N",]$q3 <- NA
+  quali$q3Sec <- timeToSec(quali$q3)
+  quali <- quali %>%
+    dplyr::mutate("qTimeSec" = dplyr::case_when(
+      !is.na(.data$q3Sec) ~ .data$q3Sec,
+      !is.na(.data$q2Sec) ~ .data$q2Sec,
+      !is.na(.data$q1Sec) ~ .data$q1Sec,
+      TRUE ~ NA
+    )) %>%
+    dplyr::group_by(.data$raceId) %>%
+    dplyr::mutate("qGapSec" = .data$qTimeSec - min(.data$qTimeSec),
+                  "qGapPerc" = .data$qTimeSec / (.data$qGapSec + .data$qTimeSec)) %>%
+    dplyr::ungroup()
+
+  # -------- Results ----------------------------------
+  results <- f1model::results
+  results$fastestLapTimeSec <- timeToSec(results$fastestLapTime)
+
+  # -------- Circuits ---------------------------------
+  circuits <- f1model::circuits
+
+  # -------- Combine Frames to Races ------------------
+  races <- f1model::races
+
+
+}

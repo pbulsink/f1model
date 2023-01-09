@@ -14,10 +14,8 @@ test_that("ewma calculates moving average",{
                c(5, 5.5, 6.45, 7.805, 9.5245, 11.57205))
   expect_equal(ewma(c(1,2,3,4,5), 0.5),
                c(1, 1.5, 2.25, 3.125, 4.0625))
-
   expect_equal(ewma(c(1,2,NA,3,4,5), 0.5),
                c(1,1.5, 1.5, 2.25, 3.125, 4.0625))
-
   expect_equal(ewma(c(NA, NA, 1,2,3,4,5), 0.5),
                c(NA, NA, 1, 1.5, 2.25, 3.125, 4.0625))
 })
