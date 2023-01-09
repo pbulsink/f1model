@@ -3,6 +3,11 @@ getCurrentSeason <- function() {
 }
 
 .timeToSec <- function(t) {
+  if(is.na(t)){
+    return(NA)
+  } else if (t == ""){
+    return(0)
+  }
   if (grepl("+", t, fixed = T)) {
     t <- gsub("+", "", t, fixed = T)
   }
