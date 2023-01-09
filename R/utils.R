@@ -2,15 +2,15 @@ getCurrentSeason <- function() {
   return(f1dataR::get_current_season())
 }
 
-.timeToSec <- function(time) {
-  if (grepl("+", time, fixed = T)) {
-    gsub("+", "", time, fixed = T)
+.timeToSec <- function(t) {
+  if (grepl("+", t, fixed = T)) {
+    t<-gsub("+", "", t, fixed = T)
   }
-  if (grepl("s", time, fixed = T)) {
-    gsub("s", "", time, fixed = T)
+  if (grepl("s", t, fixed = T)) {
+    t<-gsub("s", "", t, fixed = T)
   }
-  ms <- as.integer(strsplit(time, ".", fixed = T)[[1]][2])
-  minsec <- strsplit(time, ".", fixed = T)[[1]][1]
+  ms <- as.integer(strsplit(t, ".", fixed = T)[[1]][2])
+  minsec <- strsplit(t, ".", fixed = T)[[1]][1]
   if (grepl(":", minsec, fixed = T)) {
     minutes <- as.integer(strsplit(minsec, ":", fixed = T)[[1]][1])
     seconds <- as.integer(strsplit(minsec, ":", fixed = T)[[1]][2])
@@ -23,3 +23,23 @@ getCurrentSeason <- function() {
 }
 
 timeToSec <- Vectorize(.timeToSec, SIMPLIFY = T, USE.NAMES = F)
+
+ewma <- function(x, a) {
+  x<-as.numeric(x)
+  if(min(which(!is.na(x))) != 1){
+    #handle if a vector starts with NA values
+    nastart<-min(which(!is.na(x)))
+    x<-x[nastart:length(x)]
+  } else {
+    nastart<-0
+  }
+  # From https://stackoverflow.com/q/42774001 but they had alpha backwards
+  s1 <- x[1]
+  sk <- s1
+  s <- vapply(x[-1], function(x) ifelse(is.na(x), sk, sk <<- a * x + (1-a) * sk), 0)
+  s <- c(s1, s)
+  if(nastart){
+    s<-c(rep(NA, nastart-1), s)
+  }
+  return(s)
+}
