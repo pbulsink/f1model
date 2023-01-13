@@ -48,3 +48,37 @@ ewma <- function(x, a) {
   }
   return(s)
 }
+
+updateSeason <- function(constructorId){
+  stopifnot(is.integer(constructorId))
+  stopifnot(constructorId > 0)
+  stopifnot(constructorId <= max(constructors$constructorId))
+
+  if(constructorId %in% c(1,3,6,210)){
+    # maclaren, williams, ferarri, haas
+    return(constructorId)
+  } else if(constructorId %in% c(11,16,23,25,131)){
+    # mercedes
+    return(131)
+  } else if(constructorId %in% c(2,15,51)){
+    # alfa romeo
+    return(51)
+  } else if(constructorId %in% c(4,22,53,208,214)){
+    # alpine
+    return(214)
+  } else if(constructorId %in% c(5,18,213)){
+    # alpha tauri
+    return(213)
+  } else if(constructorId %in% c(10,12,13,14,17,211,117)){
+    # aston martin
+    return(117)
+  } else if(constructorId %in% c(19,24,9)){
+    # red bull
+    return(9)
+  } else {
+    logger::log_info(glue::glue("ConstructorId {id} (team: {team} has no modern team.",
+                       id = constructorId,
+                       team = constructors[constructorId == constructorId,]$name))
+    return(constructorId)
+  }
+}
