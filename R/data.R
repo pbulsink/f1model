@@ -266,7 +266,8 @@ getRacePractices<-function(raceId){
   return(practice_data)
 }
 
-combineData <- function(){
+combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailureEWMA = 0.05,
+                        disqualifiedEWMA = .05){
   # This function combines the data from the saved data sets to one
   # useful data frame for modelling. It also includes reprocessing
   # steps.
@@ -278,19 +279,21 @@ combineData <- function(){
   # -------- Constructor Standings --------------------
   logger::log_info("Manipulating Constructors")
   constructor_standings <- f1model::constructor_standings
+  constructor_standings$currentConstructorId <- updateConstructor(constructor_standings$constructorId)
 
   # -------- Practices --------------------------------
   logger::log_info("Manipulating Practices")
-  practices <- f1model::practices
-  practices$practiceTimeSec <- timeToSec(practices$time)
-  practices$practiceGapSec <- timeToSec(practices$gap)
-  practices <- practices %>%
+  practices <- f1model::practices %>%
+    dplyr::mutate("currentConstructorId" = updateConstructor(.data$constructorId),
+                  "practiceTimeSec" = timeToSec(.data$time),
+                  "practiceGapSec" = timeToSec(.data$gap)) %>%
     dplyr::group_by(.data$raceId, .data$practiceNum) %>%
     dplyr::mutate("practiceTimePerc" = .data$practiceTimeSec/min(.data$practiceTimeSec)) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$driverId) %>%
     dplyr::mutate("driverPracticeAvgSec" = mean(.data$practiceTimeSec),
-                  "driverPracticeAvgPerc" = mean(.data$practiceTimePerc)) %>%
+                  "driverPracticeAvgPerc" = mean(.data$practiceTimePerc),
+                  "driverNumPracticeLaps" = sum(.data$laps)) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$constructorId) %>%
     dplyr::mutate("constructorPracticeAvgSec" = mean(.data$practiceTimeSec),
@@ -307,7 +310,7 @@ combineData <- function(){
 
 
   # -------- Quali ------------------------------------
-  logger::log_info("Manipulating Quali")
+  logger::log_info("Manipulating Qualis")
   quali<- f1model::qualifying
   quali[quali$q1 == "\\N",]$q1 <- NA
   quali$q1Sec <- timeToSec(quali$q1)
@@ -316,6 +319,7 @@ combineData <- function(){
   quali[quali$q3 == "\\N",]$q3 <- NA
   quali$q3Sec <- timeToSec(quali$q3)
   quali <- quali %>%
+    dplyr::mutate("currentConstructorId" = updateConstructor(.data$constructorId)) %>%
     dplyr::mutate("qTimeSec" = dplyr::case_when(
       !is.na(.data$q3Sec) ~ .data$q3Sec,
       !is.na(.data$q2Sec) ~ .data$q2Sec,
@@ -329,16 +333,48 @@ combineData <- function(){
 
   # -------- Results ----------------------------------
   logger::log_info("Manipulating Results")
-  results <- f1model::results
-  results$fastestLapTimeSec <- timeToSec(results$fastestLapTime)
+  results <- f1model::results %>%
+    dplyr::mutate("currentConstructorId" = updateConstructor(.data$constructorId),
+                  "fastestLapTimeSec" = timeToSec(.data$fastestLapTime)) %>%
+    dplyr::mutate("driverCrash" = ifelse(.data$statusId %in% c(3,4,20,33, 41, 73,82, 104,107,130,137,138), 1, 0),
+                  "carFailure" = ifelse(.data$statusId %in% c(5:10, 21:26, 28, 30:32, 34:40, 42:44, 46:49, 51, 54, 56, 59, 61, 63:72, 74:76,79,80,83:87,90,91,93:95,98,99,101:103,105,106,108:110, 121,126,129,131:136,140,141), 1, 0),
+                  "tireFailure" = ifelse(.data$statusId %in% c(27, 29), 1, 0),
+                  "disqualified" = ifelse(.data$statusId %in% c(2), 1, 0)) %>%
+    dplyr::group_by(.data$driverId) %>%
+    dplyr::mutate("driverCrashRate" = ewma(.data$driverCrash, driverCrashEWMA),
+                  "carFailureRate" = ewma(.data$carFailure, carFailureEWMA),
+                  "tireFailureRate" = ewma(.data$tireFailure, tireFailureEWMA),
+                  "disqualifiedRate" = ewma(.data$disqualified, disqualifiedEWMA)) %>%
+    dplyr::ungroup()
 
   # -------- Circuits ---------------------------------
   logger::log_info("Manipulating Circuits")
   circuits <- f1model::circuits
 
-  # -------- Combine Frames to Races ------------------
-  logger::log_info("Merging Frames")
-  races <- f1model::races
+  # -------- Races ------------------
+  logger::log_info("Races")
+  races <- f1model::races %>%
+    dplyr::mutate('date' = as.Date(.data$date)) %>%
+    dplyr::arrange(date) %>%
+    dplyr::filter(.data$date > as.Date("1999-12-31")) %>%
+    dplyr::mutate("safetyCars" = ifelse(is.na(.data$safetyCars), 0, .data$safetyCars),
+                  "safetyCarLaps" = ifelse(is.na(.data$safetyCarLaps), 0, .data$safetyCarLaps)) %>%
+    dplyr::select(c('raceId', 'year', 'round', 'circuitId', 'name', 'date', 'weather',
+                    'safetyCars', 'safetyCarLaps', 'f1RaceId')) %>%
+    # solve circuit avg # safety cars
+    dplyr::group_by(.data$circuitId) %>%
+    dplyr::mutate('avgSafetyCar' = cumsum(.data$safetyCars > 0) / seq_along(.data$safetyCars),
+                  'avgSafetyCarPerRace' = dplyr::cummean(.data$safetyCars)) %>%
+    dplyr::ungroup() %>%
+    # solve number of races per driver
+    dplyr::group_by(.data$driverId) %>%
+    dplyr::mutate("driverGPExperience" = seq.int(0, dplyr::n()-1)) %>%
+    dplyr::ungroup() # %>%
+
+
+
+
+
 
 
 }
