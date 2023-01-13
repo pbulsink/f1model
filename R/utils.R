@@ -49,7 +49,7 @@ ewma <- function(x, a) {
   return(s)
 }
 
-updateSeason <- function(constructorId){
+.updateConstructor <- function(constructorId){
   stopifnot(is.integer(constructorId))
   stopifnot(constructorId > 0)
   stopifnot(constructorId <= max(constructors$constructorId))
@@ -82,3 +82,5 @@ updateSeason <- function(constructorId){
     return(constructorId)
   }
 }
+
+updateConstructor<-Vectorize(.updateConstructor, SIMPLIFY = T, USE.NAMES = F)
