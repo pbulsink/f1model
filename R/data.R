@@ -33,7 +33,7 @@ getWeather <- function(race_url){
 
   if(is.null(race_weather)){
     #Try the italian site - it's apparently more robust
-    message(glue::glue("f1model:::getWeather: Trying to get weather from Italian Wikipedia instead of {url}",
+    logger::log_warn(glue::glue("f1model:::getWeather: Trying to get weather from Italian Wikipedia instead of {url}",
                        url=race_url))
     it_url = grep(pattern = "https:\\/\\/it.wikipedia.org\\/wiki\\/[a-zA-Z0-9_%]*",
                  x = RCurl::getURLContent(race_url,
@@ -58,7 +58,7 @@ getWeather <- function(race_url){
 
   #Bin weather to few option or show the value and mark unknown
   if(is.null(race_weather)){
-    message("f1model:::getWeather: Race Weather not found")
+    logger::log_info("f1model:::getWeather: Race Weather not found")
     race_weather <- 'unknown'
   } else if (grepl("showers|wet|rain|pioggia|damp|thunderstorms|rainy", race_weather, ignore.case = T)){
     race_weather <- 'wet'
@@ -71,7 +71,7 @@ getWeather <- function(race_url){
   } else if (grepl("soleggiato|clear|warm|hot|sunny|fine|mild|sereno", race_weather, ignore.case = T)){
     race_weather <- 'warm'
   } else {
-    message(glue::glue("f1model:::getWeather: Race Weather of {race_weather} is unknown type. From {url}",
+    logger::log_info(glue::glue("f1model:::getWeather: Race Weather of {race_weather} is unknown type. From {url}",
                        race_weather=race_weather, url=race_url))
     race_weather <- 'unknown'
   }
@@ -179,18 +179,25 @@ getRacePractices<-function(raceId){
       code <- "RSS"
     }
     if(code == "ALB"){
+      logger::log_debug("Separating ALB")
       driverId <- ifelse(practice_data[i,]$driverName == "Alexander Albon", 848, 27)
     } else if (code == "MSC"){
+      logger::log_debug("Separating MSC")
       driverId <- ifelse(practice_data[i,]$driverName == "Michael Schumacher", 30, 854)
     } else if (code == "HAR"){
+      logger::log_debug("Separating HAR")
       driverId <- ifelse(practice_data[i,]$driverName == "Brendon Hartley", 843, 837)
     } else if (code == "BIA"){
+      logger::log_debug("Separating BIA")
       driverId <- ifelse(practice_data[i,]$driverName == "Jules Bianchi", 824, 376)
     } else if (code == "MAG"){
+      logger::log_debug("Separating MAG")
       driverId <- ifelse(practice_data[i,]$driverName == "Kevin Magnussen", 825, 76)
     } else if (code == "VER"){
+      logger::log_debug("Separating VER")
       driverId <- ifelse(practice_data[i,]$driverName == "Max Verstappen", 830, 818)
     } else if (code == "PAN"){
+      logger::log_debug("Separating PAN")
       driverId <- ifelse(practice_data[i,]$driverName == "Olivier Panis", 44, 45)
     } else {
       driverId <- f1model::drivers[f1model::drivers$code == code,]$driverId
@@ -203,7 +210,7 @@ getRacePractices<-function(raceId){
         practice_data[i, ]$constructorId <- constructorId
       }
     } else {
-      message(glue::glue("Driver {driver} not found: {drivername}",
+      logger::log_info(glue::glue("Driver {driver} not found: {drivername}",
                          driver = code,
                          drivername = practice_data[i,]$driverName))
       next
@@ -249,7 +256,7 @@ getRacePractices<-function(raceId){
         grepl("lotus renault", const, ignore.case = T) ~ 208,
         TRUE ~ NA_real_)
       if(is.na(practice_data[i, ]$constructorId)){
-        message(glue::glue("Found Unknown driverCar: {car} for Driver {driver} in raceId: {race}",
+        logger::log_warn(glue::glue("Found Unknown driverCar: {car} for Driver {driver} in raceId: {race}",
                          car = const, driver = practice_data[i,]$driverCode,
                          race = raceId))
       }
@@ -265,12 +272,15 @@ combineData <- function(){
   # steps.
 
   # -------- Driver Standings -------------------------
+  logger::log_info("Manipulating Drivers")
   driver_standings <- f1model::driver_standings
 
   # -------- Constructor Standings --------------------
+  logger::log_info("Manipulating Constructors")
   constructor_standings <- f1model::constructor_standings
 
   # -------- Practices --------------------------------
+  logger::log_info("Manipulating Practices")
   practices <- f1model::practices
   practices$practiceTimeSec <- timeToSec(practices$time)
   practices$practiceGapSec <- timeToSec(practices$gap)
@@ -297,6 +307,7 @@ combineData <- function(){
 
 
   # -------- Quali ------------------------------------
+  logger::log_info("Manipulating Quali")
   quali<- f1model::qualifying
   quali[quali$q1 == "\\N",]$q1 <- NA
   quali$q1Sec <- timeToSec(quali$q1)
@@ -317,13 +328,16 @@ combineData <- function(){
     dplyr::ungroup()
 
   # -------- Results ----------------------------------
+  logger::log_info("Manipulating Results")
   results <- f1model::results
   results$fastestLapTimeSec <- timeToSec(results$fastestLapTime)
 
   # -------- Circuits ---------------------------------
+  logger::log_info("Manipulating Circuits")
   circuits <- f1model::circuits
 
   # -------- Combine Frames to Races ------------------
+  logger::log_info("Merging Frames")
   races <- f1model::races
 
 
