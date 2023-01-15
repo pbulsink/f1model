@@ -272,14 +272,27 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
   # useful data frame for modelling. It also includes reprocessing
   # steps.
 
-  # -------- Driver Standings -------------------------
+  # -------- Drivers ----------------------------------
   logger::log_info("Manipulating Drivers")
+  drivers <- f1model::drivers %>%
+    dplyr::mutate('driverName' = paste(.data$forename, .data$surname)) %>%
+    dplyr::select(c('driverId', 'code', 'driverName', 'dob', 'nationality')) %>%
+    dplyr::rename('driverCode' = 'code', 'driverDOB' = 'dob', 'driverNationality' = 'nationality')
+
+  # -------- Driver Standings -------------------------
+  logger::log_info("Manipulating Drivers Standings")
   driver_standings <- f1model::driver_standings
 
-  # -------- Constructor Standings --------------------
+  # -------- Constructors -----------------------------
   logger::log_info("Manipulating Constructors")
-  constructor_standings <- f1model::constructor_standings
-  constructor_standings$currentConstructorId <- updateConstructor(constructor_standings$constructorId)
+  constructors<-f1model::constructors %>%
+    dplyr::select(c('constructorId', 'name', 'nationality')) %>%
+    dplyr::rename(c('constructorName' = 'name', 'constructorNationality' = 'nationality'))
+
+  # -------- Constructor Standings --------------------
+  logger::log_info("Manipulating Constructors Standings")
+  constructor_standings <- f1model::constructor_standings %>%
+    dplyr::mutate('currentConstructorId' = updateConstructor(.data$constructorId))
 
   # -------- Practices --------------------------------
   logger::log_info("Manipulating Practices")
@@ -292,21 +305,40 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$driverId) %>%
     dplyr::mutate('driverPracticeAvgSec' = mean(.data$practiceTimeSec),
+                  'driverPracticeBestPerc' = min(.data$practiceTimePerc),
                   'driverPracticeAvgPerc' = mean(.data$practiceTimePerc),
-                  'driverNumPracticeLaps' = sum(.data$laps)) %>%
+                  'driverNumPracticeLaps' = sum(.data$laps),
+                  'driverAvgPracticePos' = mean(.data$position)) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$constructorId) %>%
     dplyr::mutate('constructorPracticeAvgSec' = mean(.data$practiceTimeSec),
-                  'constructorPracticeAvgPerc' = mean(.data$practiceTimePerc)) %>%
+                  'constructorPracticeAvgPerc' = mean(.data$practiceTimePerc),
+                  'constructorPracticeBestPerc' = min(.data$practiceTimePerc),
+                  'constructorNumPracticeLaps' = sum(.data$laps)) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$practiceNum) %>%
     dplyr::mutate('driverTeamPracticeGapSec' = .data$practiceTimeSec - .data$constructorPracticeAvgSec,
                   'driverTeamPracticeGapPerc' = .data$practiceTimeSec / .data$constructorPracticeAvgSec) %>%
     dplyr::ungroup() %>%
+    dplyr::group_by(.data$raceId) %>%
+    dplyr::mutate('avgDriverPracticeLaps' = mean(.data$driverNumPracticeLaps),
+                  'avgConstructorPracticeLaps' = mean(.data$constructorNumPracticeLaps)) %>%
+    dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$driverId) %>%
-    dplyr::mutate('driverTeamPracticeAvgGapSec' = mean(.data$driverTeamPracticeGapSec),
-                  'driverTeamPracticeAvgGapPerc' = mean(.data$driverTeamPracticeGapPerc)) %>%
-    dplyr::ungroup()
+    dplyr::mutate('constructorPracticeBestPerc' = min(.data$constructorPracticeAvgPerc),
+                  'constructorPracticeAvgPerc' = mean(.data$constructorPracticeAvgPerc),
+                  'driverTeamPracticeAvgGapSec' = mean(.data$driverTeamPracticeGapSec),
+                  'driverTeamPracticeAvgGapPerc' = mean(.data$driverTeamPracticeGapPerc),
+                  'driverPercPracticeLaps' = .data$driverNumPracticeLaps / .data$avgDriverPracticeLaps) %>%
+    dplyr::ungroup() %>%
+    dplyr::group_by(.data$raceId, .data$constructorId) %>%
+    dplyr::mutate('constructorPercPracticeLaps' = .data$constructorNumPracticeLaps / .data$avgConstructorPracticeLaps)
+    dplyr::ungroup() %>%
+    dplyr::select(c('driverId', 'constructorId', 'raceId',
+                    'driverPercPracticeLaps', 'constructorPercPracticeLaps',
+                    'driverPracticeBestPerc', 'driverPracticeAvgPerc',
+                    'constructorPracticeBestPerc', 'constructorPracticeAvgPerc',
+                    'driverTeamPracticeAvgGapPerc'))
 
 
   # -------- Quali ------------------------------------
@@ -350,11 +382,15 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
 
   # -------- Circuits ---------------------------------
   logger::log_info("Manipulating Circuits")
-  circuits <- f1model::circuits
+  circuits <- f1model::circuits %>%
+    dplyr::select(c('circuitId', 'name', 'location', 'country', 'lat', 'long', 'alt', 'length', 'type', 'direction')) %>%
+    dplyr::rename('circuitName' = 'name', 'circuitLocation' = 'location', 'circuitCountry' = 'country',
+                  'circuitLat' = 'lat', 'circuitLong' = 'long', 'circuitAltitude' = 'alt',
+                  'circuitLength' = 'length', 'circuitType' = 'type', 'circuitDirection' = 'direction')
 
   # -------- Races ------------------
   logger::log_info("Races")
-  races <- f1model::races %>%
+  modeldata <- f1model::races %>%
     dplyr::mutate('date' = as.Date(.data$date)) %>%
     dplyr::arrange(date) %>%
     dplyr::filter(.data$date > as.Date("1999-12-31")) %>%
@@ -379,13 +415,13 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     dplyr::mutate('driverAge' = lubridate::time_length(difftime(as.Date(.data$date), as.Date(.data$dob)), units = "years")) %>%
     # solve number of races per driver
     dplyr::group_by(.data$driverId) %>%
-    dplyr::ungroup() # %>%
     dplyr::mutate('driverGPExperience' = seq.int(0, dplyr::n()-1)) %>%
+    dplyr::ungroup() #%>%
 
 
 
 
 
 
-
+  return(modeldata)
 }
