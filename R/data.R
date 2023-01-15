@@ -59,21 +59,21 @@ getWeather <- function(race_url){
   #Bin weather to few option or show the value and mark unknown
   if(is.null(race_weather)){
     logger::log_info("f1model:::getWeather: Race Weather not found")
-    race_weather <- 'unknown'
+    race_weather <- "unknown"
   } else if (grepl("showers|wet|rain|pioggia|damp|thunderstorms|rainy", race_weather, ignore.case = T)){
-    race_weather <- 'wet'
+    race_weather <- "wet"
   } else if(grepl("cloudy|grey|coperto|clouds|nuvoloso|overcast", race_weather, ignore.case = T)){
-    race_weather <- 'cloudy'
+    race_weather <- "cloudy"
   } else if (grepl("dry|asciutto", race_weather, ignore.case = T)){
-    race_weather <- 'dry'
+    race_weather <- "dry"
   } else if (grepl("cold|fresh|chilly|cool", race_weather, ignore.case = T)){
-    race_weather <- 'cold'
+    race_weather <- "cold"
   } else if (grepl("soleggiato|clear|warm|hot|sunny|fine|mild|sereno", race_weather, ignore.case = T)){
-    race_weather <- 'warm'
+    race_weather <- "warm"
   } else {
     logger::log_info(glue::glue("f1model:::getWeather: Race Weather of {race_weather} is unknown type. From {url}",
                        race_weather=race_weather, url=race_url))
-    race_weather <- 'unknown'
+    race_weather <- "unknown"
   }
 
   return(race_weather)
@@ -97,13 +97,13 @@ getPracticeTimes<-function(f1RaceId, year, practiceNum){
     } else if (nrow(practice_table)>0){
       #hopefully all ok?
       practice_table <- practice_table %>%
-        dplyr::select(c("Pos", "No", "Driver", "Car", "Time", "Gap", "Laps"))
+        dplyr::select(c('Pos', 'No', 'Driver', 'Car', 'Time', 'Gap', 'Laps'))
       #reformat driver name/code field
       practice_table$Driver = gsub("\\n", "", practice_table$Driver)
       practice_table$Driver = gsub("\\s+", " ", practice_table$Driver)
 
-      colnames(practice_table) <- c("position", "driverNum", "driverName",
-                                    "driverCar", "time", "gap", "laps")
+      colnames(practice_table) <- c('position', 'driverNum', 'driverName',
+                                    'driverCar', 'time', 'gap', 'laps')
 
       #split driver code from name
       practice_table$driverCode<-substr(x = practice_table$driverName, nchar(practice_table$driverName)-2, nchar(practice_table$driverName))
@@ -127,15 +127,15 @@ getRacePractices<-function(raceId){
   stopifnot(!is.na(rs[rs$raceId == raceId,]$f1RaceId))
 
   #get practices
-  practice_data<-data.frame("position" = integer(),
-                            "driverNum" = integer(),
-                            "driverName" = character(),
-                            "driverCode" = character(),
-                            "driverCar" = character(),
-                            "time" = character(),
-                            "gap" = character(),
-                            "laps" = integer(),
-                            "practiceNum" = integer()
+  practice_data<-data.frame('position' = integer(),
+                            'driverNum' = integer(),
+                            'driverName' = character(),
+                            'driverCode' = character(),
+                            'driverCar' = character(),
+                            'time' = character(),
+                            'gap' = character(),
+                            'laps' = integer(),
+                            'practiceNum' = integer()
   )
 
   for(i in 1:4){
@@ -162,7 +162,7 @@ getRacePractices<-function(raceId){
 
   #add driver/constructor lookups
   driverConstructor <- f1model::results[f1model::results$raceId == raceId,
-                                        c("driverId", "constructorId")]
+                                        c('driverId', 'constructorId')]
 
   practice_data$driverId <- NA
   practice_data$constructorId <- NA
@@ -284,28 +284,28 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
   # -------- Practices --------------------------------
   logger::log_info("Manipulating Practices")
   practices <- f1model::practices %>%
-    dplyr::mutate("currentConstructorId" = updateConstructor(.data$constructorId),
-                  "practiceTimeSec" = timeToSec(.data$time),
-                  "practiceGapSec" = timeToSec(.data$gap)) %>%
+    dplyr::mutate('currentConstructorId' = updateConstructor(.data$constructorId),
+                  'practiceTimeSec' = timeToSec(.data$time),
+                  'practiceGapSec' = timeToSec(.data$gap)) %>%
     dplyr::group_by(.data$raceId, .data$practiceNum) %>%
     dplyr::mutate("practiceTimePerc" = .data$practiceTimeSec/min(.data$practiceTimeSec)) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$driverId) %>%
-    dplyr::mutate("driverPracticeAvgSec" = mean(.data$practiceTimeSec),
-                  "driverPracticeAvgPerc" = mean(.data$practiceTimePerc),
-                  "driverNumPracticeLaps" = sum(.data$laps)) %>%
+    dplyr::mutate('driverPracticeAvgSec' = mean(.data$practiceTimeSec),
+                  'driverPracticeAvgPerc' = mean(.data$practiceTimePerc),
+                  'driverNumPracticeLaps' = sum(.data$laps)) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$constructorId) %>%
-    dplyr::mutate("constructorPracticeAvgSec" = mean(.data$practiceTimeSec),
-                  "constructorPracticeAvgPerc" = mean(.data$practiceTimePerc)) %>%
+    dplyr::mutate('constructorPracticeAvgSec' = mean(.data$practiceTimeSec),
+                  'constructorPracticeAvgPerc' = mean(.data$practiceTimePerc)) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$practiceNum) %>%
-    dplyr::mutate("driverTeamPracticeGapSec" = .data$practiceTimeSec - .data$constructorPracticeAvgSec,
-                  "driverTeamPracticeGapPerc" = .data$practiceTimeSec / .data$constructorPracticeAvgSec) %>%
+    dplyr::mutate('driverTeamPracticeGapSec' = .data$practiceTimeSec - .data$constructorPracticeAvgSec,
+                  'driverTeamPracticeGapPerc' = .data$practiceTimeSec / .data$constructorPracticeAvgSec) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$driverId) %>%
-    dplyr::mutate("driverTeamPracticeAvgGapSec" = mean(.data$driverTeamPracticeGapSec),
-                  "driverTeamPracticeAvgGapPerc" = mean(.data$driverTeamPracticeGapPerc)) %>%
+    dplyr::mutate('driverTeamPracticeAvgGapSec' = mean(.data$driverTeamPracticeGapSec),
+                  'driverTeamPracticeAvgGapPerc' = mean(.data$driverTeamPracticeGapPerc)) %>%
     dplyr::ungroup()
 
 
@@ -319,33 +319,34 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
   quali[quali$q3 == "\\N",]$q3 <- NA
   quali$q3Sec <- timeToSec(quali$q3)
   quali <- quali %>%
-    dplyr::mutate("currentConstructorId" = updateConstructor(.data$constructorId)) %>%
-    dplyr::mutate("qTimeSec" = dplyr::case_when(
+    dplyr::mutate('currentConstructorId' = updateConstructor(.data$constructorId)) %>%
+    dplyr::mutate('qTimeSec' = dplyr::case_when(
       !is.na(.data$q3Sec) ~ .data$q3Sec,
       !is.na(.data$q2Sec) ~ .data$q2Sec,
       !is.na(.data$q1Sec) ~ .data$q1Sec,
       TRUE ~ NA
     )) %>%
     dplyr::group_by(.data$raceId) %>%
-    dplyr::mutate("qGapSec" = .data$qTimeSec - min(.data$qTimeSec),
-                  "qGapPerc" = .data$qTimeSec / (.data$qGapSec + .data$qTimeSec)) %>%
+    dplyr::mutate('qGapSec' = .data$qTimeSec - min(.data$qTimeSec),
+                  'qGapPerc' = .data$qTimeSec / (.data$qGapSec + .data$qTimeSec)) %>%
     dplyr::ungroup()
 
   # -------- Results ----------------------------------
   logger::log_info("Manipulating Results")
   results <- f1model::results %>%
-    dplyr::mutate("currentConstructorId" = updateConstructor(.data$constructorId),
-                  "fastestLapTimeSec" = timeToSec(.data$fastestLapTime)) %>%
-    dplyr::mutate("driverCrash" = ifelse(.data$statusId %in% c(3,4,20,33, 41, 73,82, 104,107,130,137,138), 1, 0),
-                  "carFailure" = ifelse(.data$statusId %in% c(5:10, 21:26, 28, 30:32, 34:40, 42:44, 46:49, 51, 54, 56, 59, 61, 63:72, 74:76,79,80,83:87,90,91,93:95,98,99,101:103,105,106,108:110, 121,126,129,131:136,140,141), 1, 0),
-                  "tireFailure" = ifelse(.data$statusId %in% c(27, 29), 1, 0),
-                  "disqualified" = ifelse(.data$statusId %in% c(2), 1, 0)) %>%
+    dplyr::mutate('currentConstructorId' = updateConstructor(.data$constructorId),
+                  'fastestLapTimeSec' = timeToSec(.data$fastestLapTime)) %>%
+    dplyr::mutate('driverCrash' = ifelse(.data$statusId %in% c(3,4,20,33, 41, 73,82, 104,107,130,137,138), 1, 0),
+                  'carFailure' = ifelse(.data$statusId %in% c(5:10, 21:26, 28, 30:32, 34:40, 42:44, 46:49, 51, 54, 56, 59, 61, 63:72, 74:76,79,80,83:87,90,91,93:95,98,99,101:103,105,106,108:110, 121,126,129,131:136,140,141), 1, 0),
+                  'tireFailure' = ifelse(.data$statusId %in% c(27, 29), 1, 0),
+                  'disqualified' = ifelse(.data$statusId %in% c(2), 1, 0)) %>%
     dplyr::group_by(.data$driverId) %>%
-    dplyr::mutate("driverCrashRate" = ewma(.data$driverCrash, driverCrashEWMA),
-                  "carFailureRate" = ewma(.data$carFailure, carFailureEWMA),
-                  "tireFailureRate" = ewma(.data$tireFailure, tireFailureEWMA),
-                  "disqualifiedRate" = ewma(.data$disqualified, disqualifiedEWMA)) %>%
-    dplyr::ungroup()
+    dplyr::mutate('driverCrashRate' = ewma(.data$driverCrash, driverCrashEWMA),
+                  'carFailureRate' = ewma(.data$carFailure, carFailureEWMA),
+                  'tireFailureRate' = ewma(.data$tireFailure, tireFailureEWMA),
+                  'disqualifiedRate' = ewma(.data$disqualified, disqualifiedEWMA)) %>%
+    dplyr::ungroup() %>%
+    dplyr::rename('finishingTime' = 'time')
 
   # -------- Circuits ---------------------------------
   logger::log_info("Manipulating Circuits")
@@ -357,8 +358,8 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     dplyr::mutate('date' = as.Date(.data$date)) %>%
     dplyr::arrange(date) %>%
     dplyr::filter(.data$date > as.Date("1999-12-31")) %>%
-    dplyr::mutate("safetyCars" = ifelse(is.na(.data$safetyCars), 0, .data$safetyCars),
-                  "safetyCarLaps" = ifelse(is.na(.data$safetyCarLaps), 0, .data$safetyCarLaps)) %>%
+    dplyr::mutate('safetyCars' = ifelse(is.na(.data$safetyCars), 0, .data$safetyCars),
+                  'safetyCarLaps' = ifelse(is.na(.data$safetyCarLaps), 0, .data$safetyCarLaps)) %>%
     dplyr::select(c('raceId', 'year', 'round', 'circuitId', 'name', 'date', 'weather',
                     'safetyCars', 'safetyCarLaps', 'f1RaceId')) %>%
     # solve circuit avg # safety cars
@@ -368,8 +369,8 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     dplyr::ungroup() %>%
     # solve number of races per driver
     dplyr::group_by(.data$driverId) %>%
-    dplyr::mutate("driverGPExperience" = seq.int(0, dplyr::n()-1)) %>%
     dplyr::ungroup() # %>%
+    dplyr::mutate('driverGPExperience' = seq.int(0, dplyr::n()-1)) %>%
 
 
 
