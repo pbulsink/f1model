@@ -362,11 +362,21 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
                   'safetyCarLaps' = ifelse(is.na(.data$safetyCarLaps), 0, .data$safetyCarLaps)) %>%
     dplyr::select(c('raceId', 'year', 'round', 'circuitId', 'name', 'date', 'weather',
                     'safetyCars', 'safetyCarLaps', 'f1RaceId')) %>%
+    # Previous Race Determination
+    dplyr::mutate('lastRaceId' = ifelse(.data$round > 1,
+                                      races[races$round == .data$round - 1 & races$year == .data$year,]$raceId,
+                                      max(races[races$year == .data$year - 1, ]$raceId))) %>%
     # solve circuit avg # safety cars
     dplyr::group_by(.data$circuitId) %>%
     dplyr::mutate('avgSafetyCar' = cumsum(.data$safetyCars > 0) / seq_along(.data$safetyCars),
                   'avgSafetyCarPerRace' = dplyr::cummean(.data$safetyCars)) %>%
     dplyr::ungroup() %>%
+    # merge in results, drivers, constructors
+    dplyr::full_join(results, by = c('raceId')) %>%
+    dplyr::full_join(drivers, by = c('driverId')) %>%
+    dplyr::full_join(constructors, by = c('constructorId')) %>%
+    # solve driver's age at race
+    dplyr::mutate('driverAge' = lubridate::time_length(difftime(as.Date(.data$date), as.Date(.data$dob)), units = "years")) %>%
     # solve number of races per driver
     dplyr::group_by(.data$driverId) %>%
     dplyr::ungroup() # %>%

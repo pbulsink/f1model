@@ -15,6 +15,7 @@ Imports:
     f1dataR,
     glue,
     logger,
+    lubridate,
     magrittr,
     RCurl,
     rlang,
