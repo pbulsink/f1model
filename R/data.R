@@ -324,7 +324,7 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
   logger::log_info("Manipulating Constructors")
   constructors <- f1model::constructors %>%
     dplyr::mutate("currentConstructorId" = updateConstructor(.data$constructorId)) %>%
-    dplyr::select(c("constructorId", "name", "nationality", 'currentConstructorId')) %>%
+    dplyr::select(c("constructorId", "name", "nationality", "currentConstructorId")) %>%
     dplyr::rename(c("constructorName" = "name", "constructorNationality" = "nationality"))
 
   # -------- Constructor Standings --------------------
@@ -398,12 +398,16 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
   # -------- Quali ------------------------------------
   logger::log_info("Manipulating Qualis")
   quali <- f1model::qualifying %>%
-    dplyr::mutate('q1' = dplyr::if_else(.data$q1 == "\\N" | .data$q1 == "", NA_character_, .data$q1),
-                  'q2' = dplyr::if_else(.data$q2 == "\\N" | .data$q2 == "", NA_character_, .data$q2),
-                  'q3' = dplyr::if_else(.data$q3 == "\\N" | .data$q3 == "", NA_character_, .data$q3)) %>%
-    dplyr::mutate('q1Sec' = timeToSec(.data$q1),
-                  'q2Sec' = timeToSec(.data$q2),
-                  'q3Sec' = timeToSec(.data$q3)) %>%
+    dplyr::mutate(
+      "q1" = dplyr::if_else(.data$q1 == "\\N" | .data$q1 == "", NA_character_, .data$q1),
+      "q2" = dplyr::if_else(.data$q2 == "\\N" | .data$q2 == "", NA_character_, .data$q2),
+      "q3" = dplyr::if_else(.data$q3 == "\\N" | .data$q3 == "", NA_character_, .data$q3)
+    ) %>%
+    dplyr::mutate(
+      "q1Sec" = timeToSec(.data$q1),
+      "q2Sec" = timeToSec(.data$q2),
+      "q3Sec" = timeToSec(.data$q3)
+    ) %>%
     dplyr::group_by(.data$raceId) %>%
     dplyr::mutate(
       "q1GapSec" = .data$q1Sec - min(.data$q1Sec, na.rm = T),
@@ -456,16 +460,20 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     dplyr::mutate("gridPosCor" = cor(.data$grid, .data$positionOrder)) %>%
     dplyr::ungroup() %>%
     dplyr::rename("finishingTime" = "time") %>%
-    dplyr::select(c('raceId', 'driverId', 'constructorId', 'grid', 'position', 'positionOrder',
-                    #'status','driverCrash', 'carFailure', 'tireFailure', 'disqualified',
-                    'driverCrashRate', 'carFailureRate', 'tireFailureRate', 'disqualifiedRate', 'gridPosCor'))
+    dplyr::select(c(
+      "raceId", "driverId", "constructorId", "grid", "position", "positionOrder",
+      #' status','driverCrash', 'carFailure', 'tireFailure', 'disqualified',
+      "driverCrashRate", "carFailureRate", "tireFailureRate", "disqualifiedRate", "gridPosCor"
+    ))
 
   # -------- Circuits ---------------------------------
   logger::log_info("Manipulating Circuits")
   circuits <- f1model::circuits %>%
     dplyr::select(c("circuitId", "name", "alt", "length", "type", "direction")) %>%
-    dplyr::rename("circuitName" = "name", "circuitAltitude" = "alt", "circuitLength" = "length",
-                  "circuitType" = "type", "circuitDirection" = "direction")
+    dplyr::rename(
+      "circuitName" = "name", "circuitAltitude" = "alt", "circuitLength" = "length",
+      "circuitType" = "type", "circuitDirection" = "direction"
+    )
 
   # -------- Races ------------------
   logger::log_info("Races")
@@ -517,13 +525,15 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
       "constructorSeasonWins" = dplyr::if_else(is.na(.data$constructorSeasonWins), 0, .data$constructorSeasonWins)
     ) %>%
     dplyr::group_by(.data$raceId) %>%
-    dplyr::mutate('driverPointsPerc' = dplyr::if_else(.data$round == 1, 0, .data$driverPoints / max(.data$driverPoints, na.rm = T)),
-                  'constructorPointsPerc' = dplyr::if_else(.data$round == 1, 0, .data$constructorPoints / max(.data$constructorPoints, na.rm = T)),
-                  'driverSeasonWinsPerc' = dplyr::if_else(.data$round == 1, 0, .data$driverSeasonWins / max(.data$driverSeasonWins, na.rm = T)),
-                  'constructorSeasonWinsPerc' = dplyr::if_else(.data$round == 1, 0, .data$constructorSeasonWins / max(.data$constructorSeasonWins, na.rm = T)),
-                  'previousRaceIdAtCircuit' = dplyr::lag(.data$raceId, n=1),
-                  'previousRaceGridPosCor' = .data[.data$raceId == .data$previousRaceIdAtCircuit, 'gridPosCor'][1],
-                  'avgGridPosCor' = ewma(.data$previousRaceGridPosCor, gridPositionCorEWMA)) %>%
+    dplyr::mutate(
+      "driverPointsPerc" = dplyr::if_else(.data$round == 1, 0, .data$driverPoints / max(.data$driverPoints, na.rm = T)),
+      "constructorPointsPerc" = dplyr::if_else(.data$round == 1, 0, .data$constructorPoints / max(.data$constructorPoints, na.rm = T)),
+      "driverSeasonWinsPerc" = dplyr::if_else(.data$round == 1, 0, .data$driverSeasonWins / max(.data$driverSeasonWins, na.rm = T)),
+      "constructorSeasonWinsPerc" = dplyr::if_else(.data$round == 1, 0, .data$constructorSeasonWins / max(.data$constructorSeasonWins, na.rm = T)),
+      "previousRaceIdAtCircuit" = dplyr::lag(.data$raceId, n = 1),
+      "previousRaceGridPosCor" = .data[.data$raceId == .data$previousRaceIdAtCircuit, "gridPosCor"][1],
+      "avgGridPosCor" = ewma(.data$previousRaceGridPosCor, gridPositionCorEWMA)
+    ) %>%
     dplyr::ungroup()
 
 
