@@ -291,8 +291,18 @@ getRacePractices <- function(raceId) {
   return(practice_data)
 }
 
+#' Combine Data
+#'
+#' @description merge all of the data frames into one big one for use in modelling. EWMA parameters provided
+#' help with determining the strength of the exponential weighted moving average for those parameters.
+#'
+#' @param driverCrashEWMA How much one race impacts driver's moving average of crash rate
+#' @param carFailureEWMA How much one race impacts constructor's moving average of failure rate
+#' @param tireFailureEWMA How much one race impacts driver's moving average of tire failure rate
+#' @param disqualifiedEWMA How much one race impacts driver's moving average of disqualified rate
+#' @param gridPositionCorEWMA How much one race impacts driver's moving average of crash rate
 combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailureEWMA = 0.05,
-                        disqualifiedEWMA = .05) {
+                        disqualifiedEWMA = .05, gridPositionCorEWMA = 0.2) {
   # This function combines the data from the saved data sets to one
   # useful data frame for modelling. It also includes reprocessing
   # steps.
@@ -314,7 +324,7 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
   logger::log_info("Manipulating Constructors")
   constructors <- f1model::constructors %>%
     dplyr::mutate("currentConstructorId" = updateConstructor(.data$constructorId)) %>%
-    dplyr::select(c("constructorId", "name", "nationality", 'currentconstructorId')) %>%
+    dplyr::select(c("constructorId", "name", "nationality", 'currentConstructorId')) %>%
     dplyr::rename(c("constructorName" = "name", "constructorNationality" = "nationality"))
 
   # -------- Constructor Standings --------------------
@@ -327,7 +337,6 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
   logger::log_info("Manipulating Practices")
   practices <- f1model::practices %>%
     dplyr::mutate(
-      "currentConstructorId" = updateConstructor(.data$constructorId),
       "practiceTimeSec" = timeToSec(.data$time),
       "practiceGapSec" = timeToSec(.data$gap)
     ) %>%
@@ -378,7 +387,7 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     dplyr::mutate("constructorPercPracticeLaps" = .data$constructorNumPracticeLaps / .data$maxConstructorPracticeLaps) %>%
     dplyr::ungroup() %>%
     dplyr::select(c(
-      "driverId", "constructorId", "raceId", 'currentConstructorId',
+      "driverId", "constructorId", "raceId",
       "driverPercPracticeLaps", "constructorPercPracticeLaps",
       "driverPracticeBestPerc", "driverPracticeAvgPerc",
       "constructorPracticeBestPerc", "constructorPracticeAvgPerc",
@@ -389,9 +398,9 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
   # -------- Quali ------------------------------------
   logger::log_info("Manipulating Qualis")
   quali <- f1model::qualifying %>%
-    dplyr::mutate('q1' = dplyr::if_else(.data$q1 == "\\N" | .data$q1 == "", NA, .data$q1),
-                  'q2' = dplyr::if_else(.data$q2 == "\\N" | .data$q2 == "", NA, .data$q2),
-                  'q3' = dplyr::if_else(.data$q3 == "\\N" | .data$q3 == "", NA, .data$q3)) %>%
+    dplyr::mutate('q1' = dplyr::if_else(.data$q1 == "\\N" | .data$q1 == "", NA_character_, .data$q1),
+                  'q2' = dplyr::if_else(.data$q2 == "\\N" | .data$q2 == "", NA_character_, .data$q2),
+                  'q3' = dplyr::if_else(.data$q3 == "\\N" | .data$q3 == "", NA_character_, .data$q3)) %>%
     dplyr::mutate('q1Sec' = timeToSec(.data$q1),
                   'q2Sec' = timeToSec(.data$q2),
                   'q3Sec' = timeToSec(.data$q3)) %>%
@@ -413,7 +422,7 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
       !is.na(.data$q3GapPerc) ~ .data$q3GapPerc,
       !is.na(.data$q2GapPerc) ~ .data$q2GapPerc,
       !is.na(.data$q1GapPerc) ~ .data$q1GapPerc,
-      TRUE ~ NA
+      TRUE ~ NA_real_
     )) %>%
     dplyr::rename('qPosition' = 'position') %>%
     dplyr::select(c('raceId', 'driverId', 'constructorId', 'qPosition', 'qGapPerc'))
@@ -439,17 +448,20 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
       "disqualifiedRate" = ewma(.data$disqualified, disqualifiedEWMA)
     ) %>%
     dplyr::ungroup() %>%
-    dplyr::rename("finishingTime" = "time")
+    dplyr::group_by(.data$raceId) %>%
+    dplyr::mutate("gridPosCor" = cor(.data$grid, .data$positionOrder)) %>%
+    dplyr::ungroup() %>%
+    dplyr::rename("finishingTime" = "time") %>%
+    dplyr::select(c('raceId', 'driverId', 'constructorId', 'grid', 'position', 'positionOrder',
+                    #'status','driverCrash', 'carFailure', 'tireFailure', 'disqualified',
+                    'driverCrashRate', 'carFailureRate', 'tireFailureRate', 'disqualifiedRate', 'gridPosCor'))
 
   # -------- Circuits ---------------------------------
   logger::log_info("Manipulating Circuits")
   circuits <- f1model::circuits %>%
-    dplyr::select(c("circuitId", "name", "location", "country", "lat", "long", "alt", "length", "type", "direction")) %>%
-    dplyr::rename(
-      "circuitName" = "name", "circuitLocation" = "location", "circuitCountry" = "country",
-      "circuitLat" = "lat", "circuitLong" = "long", "circuitAltitude" = "alt",
-      "circuitLength" = "length", "circuitType" = "type", "circuitDirection" = "direction"
-    )
+    dplyr::select(c("circuitId", "name", "alt", "length", "type", "direction")) %>%
+    dplyr::rename("circuitName" = "name", "circuitAltitude" = "alt", "circuitLength" = "length",
+                  "circuitType" = "type", "circuitDirection" = "direction")
 
   # -------- Races ------------------
   logger::log_info("Races")
@@ -476,10 +488,12 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
       "avgSafetyCarPerRace" = dplyr::cummean(.data$safetyCars)
     ) %>%
     dplyr::ungroup() %>%
-    # merge in results, drivers, constructors
+    # merge in results, drivers, constructors, circuits
     dplyr::full_join(results, by = c("raceId")) %>%
     dplyr::left_join(drivers, by = c("driverId")) %>%
     dplyr::left_join(constructors, by = c("constructorId")) %>%
+    dplyr::left_join(circuits, by = c("circuitId")) %>%
+    dplyr::left_join(practices, by = c("raceId", "driverId", "constructorId")) %>%
     # solve driver's age at race
     dplyr::mutate("driverAge" = lubridate::time_length(difftime(as.Date(.data$date), as.Date(.data$dob)), units = "years")) %>%
     # solve number of races per driver
@@ -499,8 +513,10 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     dplyr::mutate('driverPointsPerc' = dplyr::if_else(.data$round == 1, 0, .data$driverPoints / max(.data$driverPoints, na.rm = T)),
                   'constructorPointsPerc' = dplyr::if_else(.data$round == 1, 0, .data$constructorPoints / max(.data$constructorPoints, na.rm = T)),
                   'driverSeasonWinsPerc' = dplyr::if_else(.data$round == 1, 0, .data$driverSeasonWins / max(.data$driverSeasonWins, na.rm = T)),
-                  'constructorSeasonWinsPerc' = dplyr::if_else(.data$round == 1, 0, .data$constructorSeasonWins / max(.data$constructorSeasonWins, na.rm = T))
-                  ) %>%
+                  'constructorSeasonWinsPerc' = dplyr::if_else(.data$round == 1, 0, .data$constructorSeasonWins / max(.data$constructorSeasonWins, na.rm = T)),
+                  'previousRaceIdAtCircuit' = dplyr::lag(.data$raceId, n=1),
+                  'previousRaceGridPosCor' = .data[.data$raceId == .data$previousRaceIdAtCircuit, 'gridPosCor'][1],
+                  'avgGridPosCor' = ewma(.data$previousRaceGridPosCor, gridPositionCorEWMA)) %>%
     dplyr::ungroup()
 
 
