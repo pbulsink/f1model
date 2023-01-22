@@ -49,7 +49,17 @@ ewma <- function(x, a) {
   return(s)
 }
 
+ewma_drop<-function(x, a){
+  if(length(x) > 1){
+    e<-ewma(x[-length(x)], a)
+    return(c(NA, e))
+  } else {
+    return(NA)
+  }
+}
+
 .updateConstructor <- function(constructorId) {
+  constructors <- f1model::constructors
   stopifnot(is.integer(constructorId))
   stopifnot(constructorId > 0)
   stopifnot(constructorId <= max(constructors$constructorId))
@@ -76,7 +86,7 @@ ewma <- function(x, a) {
     # red bull
     return(9)
   } else {
-    logger::log_info(glue::glue("ConstructorId {id} (team: {team}) has no modern team.",
+    logger::log_debug(glue::glue("ConstructorId {id} (team: {team}) has no modern team.",
       id = constructorId,
       team = constructors[constructors$constructorId == constructorId, ]$name
     ))

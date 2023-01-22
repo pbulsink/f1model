@@ -35,7 +35,7 @@ getWeather <- function(race_url) {
 
   if (is.null(race_weather)) {
     # Try the italian site - it's apparently more robust
-    logger::log_warn(glue::glue("f1model:::getWeather: Trying to get weather from Italian Wikipedia instead of {url}",
+    logger::log_info(glue::glue("f1model:::getWeather: Trying to get weather from Italian Wikipedia instead of {url}",
       url = race_url
     ))
     it_url <- grep(
@@ -138,6 +138,62 @@ getPracticeTimes <- function(f1RaceId, year, practiceNum) {
   return(practice_table)
 }
 
+getQualiTimes <- function(f1RaceId, year){
+  quali_url <- glue::glue("https://www.formula1.com/en/results.html/{year}/races/{id}/qualifying-0.html",
+                             year = year, id = f1RaceId)
+  quali_table <- NA
+
+  tryCatch(
+    {
+      quali_table <- rvest::html_table(rvest::read_html(quali_url))[[1]]
+      if ("PTS" %in% colnames(quali_table)) {
+        # There was no practice practiceNum, so f1 defaults back to race results
+        stop(glue::glue("There seems to be no quali, {url} returns race results.",
+                        url = quali_url
+        ))
+      } else if ("Grand Prix" %in% colnames(quali_table)) {
+        # There was likely an issue with the f1RaceId value
+        stop(glue::glue("There seems to be no race Id {raceid}, {url} returns season results for {year}.",
+                        raceid = f1RaceId, url = quali_url, year = year
+        ))
+      } else if (nrow(quali_table) > 0) {
+        # hopefully all ok?
+        if("Time" %in% colnames(quali_table)){
+          #quali 1 round only has 'Time' as column name (< 2006?)
+          quali_table <- quali_table %>%
+            dplyr::select(c("Pos", "No", "Driver", "Car", "Time"))
+          colnames(quali_table) <- c("position", "driverNum", "driverName", "driverCar", "q1")
+          quali_table$q2 <- quali_table$q3 <- NA_character_
+        } else {
+          quali_table <- quali_table %>%
+            dplyr::select(c("Pos", "No", "Driver", "Car", "Q1", "Q2", "Q3")) %>%
+            dplyr::mutate("Q1" = dplyr::if_else(.data$Q1 == "", NA_character_, .data$Q1),
+                          "Q2" = dplyr::if_else(.data$Q2 == "", NA_character_, .data$Q2),
+                          "Q3" = dplyr::if_else(.data$Q3 == "", NA_character_, .data$Q3))
+          colnames(quali_table) <- c("position", "driverNum", "driverName", "driverCar", "q1", "q2", "q3")
+        }
+
+        # split driver code from name
+        quali_table$driverCode <- substr(x = quali_table$driverName, nchar(quali_table$driverName) - 2, nchar(quali_table$driverName))
+        # reformat driver name field
+        quali_table$driverName <- gsub("\\n", "", quali_table$driverName)
+        quali_table$driverName <- gsub("\\s+", " ", quali_table$driverName)
+        quali_table$q1 <- as.character(quali_table$q1)
+        quali_table$q2 <- as.character(quali_table$q2)
+        quali_table$q3 <- as.character(quali_table$q3)
+        quali_table$position <- as.character(quali_table$position)
+      } else {
+        quali_table <- NA
+      }
+    },
+    error = function(e) {
+      # message(glue::glue("Error in f1model:::getPracticeTimes: {err}", err=e))
+      quali_table <- NA
+    }
+  )
+  return(quali_table)
+}
+
 getRacePractices <- function(raceId) {
   # inherently, we're not getting data for races with NA as f1RaceId
   rs <- f1model::races[!is.na(f1model::races$f1RaceId), ]
@@ -169,7 +225,6 @@ getRacePractices <- function(raceId) {
     Sys.sleep(5)
   }
   if (nrow(practice_data) == 0) {
-    # Qatar 2021 (raceId = 1051) has no data on f1.com, maybe others too?
     practice_data$f1RaceId <- character()
     practice_data$raceId <- practice_data$year <- practice_data$round <- integer()
     practice_data$driverId <- practice_data$constructorId <- integer()
@@ -179,68 +234,122 @@ getRacePractices <- function(raceId) {
   practice_data$f1RaceId <- rs[rs$raceId == raceId, ]$f1RaceId
   practice_data$year <- rs[rs$raceId == raceId, ]$year
   practice_data$round <- rs[rs$raceId == raceId, ]$round
+  return(assignDriverConstructor(practice_data, raceId))
+}
 
+
+getQualifying <- function(raceId) {
+  # inherently, we're not getting data for races with NA as f1RaceId
+  rs <- f1model::races[!is.na(f1model::races$f1RaceId), ]
+  stopifnot(!is.na(rs[rs$raceId == raceId, ]$f1RaceId))
+
+  # get qualifying
+  quali_data <- getQualiTimes(
+    rs[rs$raceId == raceId, ]$f1RaceId,
+    rs[rs$raceId == raceId, ]$year
+  )
+
+  if (nrow(quali_data) == 0) {
+    quali_data<-data.frame(
+      "qualifyId" = integer(),
+      "raceId" = integer(),
+      "driverId" = integer(),
+      "constructorId" = integer(),
+      "number" = integer(),
+      "position" = character(),
+      "q1" = character(),
+      "q2" = character(),
+      "q3" = character()
+    )
+    logger::log_info(glue::glue("Race Id: {raceId} returned empty qualifying data.", raceId = raceId))
+    return(NA)
+  }
+  quali_data$raceId <- raceId
+  quali_data<-assignDriverConstructor(quali_data, raceId) %>%
+    dplyr::select(c("raceId", "driverId", "constructorId", "driverNum", "position", "q1", "q2", "q3")) %>%
+    dplyr::rename("number" = "driverNum") %>%
+    dplyr::mutate("qualifyId" = NA_integer_)
+  Sys.sleep(5)
+  return(quali_data)
+}
+
+
+
+assignDriverConstructor <- function(data, raceId){
   # add driver/constructor lookups
   driverConstructor <- f1model::results[
     f1model::results$raceId == raceId,
     c("driverId", "constructorId")
   ]
 
-  practice_data$driverId <- NA
-  practice_data$constructorId <- NA
+  data$driverId <- NA
+  data$constructorId <- NA
+  drvrs<-f1model::drivers
+  drvrs$fullname <- paste(drvrs$forename, drvrs$surname)
 
-  for (i in 1:nrow(practice_data)) {
-    code <- practice_data[i, ]$driverCode
-    if (code == "RSC") {
-      code <- "SCH"
-    } else if (code == "MOY") {
-      code <- "MON"
-    } else if (code == "CHD") {
-      code <- "CHA"
-    } else if (code == "RSI") {
-      code <- "RSS"
-    }
-    if (code == "ALB") {
-      logger::log_debug("Separating ALB")
-      driverId <- ifelse(practice_data[i, ]$driverName == "Alexander Albon", 848, 27)
-    } else if (code == "MSC") {
-      logger::log_debug("Separating MSC")
-      driverId <- ifelse(practice_data[i, ]$driverName == "Michael Schumacher", 30, 854)
-    } else if (code == "HAR") {
-      logger::log_debug("Separating HAR")
-      driverId <- ifelse(practice_data[i, ]$driverName == "Brendon Hartley", 843, 837)
-    } else if (code == "BIA") {
-      logger::log_debug("Separating BIA")
-      driverId <- ifelse(practice_data[i, ]$driverName == "Jules Bianchi", 824, 376)
-    } else if (code == "MAG") {
-      logger::log_debug("Separating MAG")
-      driverId <- ifelse(practice_data[i, ]$driverName == "Kevin Magnussen", 825, 76)
-    } else if (code == "VER") {
-      logger::log_debug("Separating VER")
-      driverId <- ifelse(practice_data[i, ]$driverName == "Max Verstappen", 830, 818)
-    } else if (code == "PAN") {
-      logger::log_debug("Separating PAN")
-      driverId <- ifelse(practice_data[i, ]$driverName == "Olivier Panis", 44, 45)
-    } else {
-      driverId <- f1model::drivers[f1model::drivers$code == code, ]$driverId
+  for (i in 1:nrow(data)) {
+    if("driverCode" %in% colnames(data)){
+      code <- data[i, ]$driverCode
+      if (code == "RSC") {
+        code <- "SCH"
+      } else if (code == "MOY") {
+        code <- "MON"
+      } else if (code == "CHD") {
+        code <- "CHA"
+      } else if (code == "RSI") {
+        code <- "RSS"
+      }
+      if (code == "ALB") {
+        logger::log_debug("Separating ALB")
+        driverId <- ifelse(data[i, ]$driverName == "Alexander Albon", 848, 27)
+      } else if (code == "MSC") {
+        logger::log_debug("Separating MSC")
+        driverId <- ifelse(data[i, ]$driverName == "Michael Schumacher", 30, 854)
+      } else if (code == "HAR") {
+        logger::log_debug("Separating HAR")
+        driverId <- ifelse(data[i, ]$driverName == "Brendon Hartley", 843, 837)
+      } else if (code == "BIA") {
+        logger::log_debug("Separating BIA")
+        driverId <- ifelse(data[i, ]$driverName == "Jules Bianchi", 824, 376)
+      } else if (code == "MAG") {
+        logger::log_debug("Separating MAG")
+        driverId <- ifelse(data[i, ]$driverName == "Kevin Magnussen", 825, 76)
+      } else if (code == "VER") {
+        logger::log_debug("Separating VER")
+        driverId <- ifelse(data[i, ]$driverName == "Max Verstappen", 830, 818)
+      } else if (code == "PAN") {
+        logger::log_debug("Separating PAN")
+        driverId <- ifelse(data[i, ]$driverName == "Olivier Panis", 44, 45)
+      } else {
+        driverId <- f1model::drivers[f1model::drivers$code == code, ]$driverId
+      }
+    } else if ('driverName' %in% colnames(data)){
+      name <- data[i, ]$driverName
+      if(name %in% drvrs$fullname){
+        driverId <- drvrs[drvrs$fullname == name, ]$driverId
+      } else {
+        logger::log_info("No Driver Match for {name} in race {race}.",
+                         name = name, race = raceId)
+      }
     }
 
     if (length(driverId) != 0) {
-      practice_data[i, ]$driverId <- driverId
+      data[i, ]$driverId <- driverId
       constructorId <- driverConstructor[driverConstructor$driverId == driverId, ]$constructorId
       if (length(constructorId) > 0) {
-        practice_data[i, ]$constructorId <- constructorId
+        data[i, ]$constructorId <- constructorId
+        next
       }
     } else {
       logger::log_info(glue::glue("Driver {driver} not found: {drivername}",
         driver = code,
-        drivername = practice_data[i, ]$driverName
+        drivername = data[i, ]$driverName
       ))
       next
     }
     if (length(constructorId) == 0) {
-      const <- practice_data[i, ]$driverCar
-      practice_data[i, ]$constructorId <- dplyr::case_when(
+      const <- data[i, ]$driverCar
+      data[i, ]$constructorId <- dplyr::case_when(
         grepl("^ferrari", const, ignore.case = T) ~ 6,
         grepl("^mclaren", const, ignore.case = T) ~ 1,
         grepl("BAR", const, fixed = T, ignore.case = F) ~ 16,
@@ -279,17 +388,19 @@ getRacePractices <- function(raceId) {
         grepl("lotus renault", const, ignore.case = T) ~ 208,
         TRUE ~ NA_real_
       )
-      if (is.na(practice_data[i, ]$constructorId)) {
-        logger::log_warn(glue::glue("Found Unknown driverCar: {car} for Driver {driver} in raceId: {race}",
-          car = const, driver = practice_data[i, ]$driverCode,
+      if (is.na(data[i, ]$constructorId)) {
+        logger::log_info(glue::glue("Found Unknown driverCar: {car} for Driver {driver} in raceId: {race}",
+          car = const, driver = data[i, ]$driverCode,
           race = raceId
         ))
       }
     }
   }
 
-  return(practice_data)
+  return(data)
 }
+
+
 
 #' Combine Data
 #'
@@ -386,6 +497,15 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     dplyr::group_by(.data$raceId, .data$constructorId) %>%
     dplyr::mutate("constructorPercPracticeLaps" = .data$constructorNumPracticeLaps / .data$maxConstructorPracticeLaps) %>%
     dplyr::ungroup() %>%
+    dplyr::mutate(
+      "driverPercPracticeLaps" = dplyr::if_else(is.na(.data$driverPercPracticeLaps) , 0, .data$driverPercPracticeLaps),
+      "constructorPercPracticeLaps" = dplyr::if_else(is.na(.data$constructorPercPracticeLaps) , 0, .data$constructorPercPracticeLaps),
+      "driverPracticeBestPerc" = dplyr::if_else(is.na(.data$driverPracticeBestPerc) , 0, .data$driverPracticeBestPerc),
+      "driverPracticeAvgPerc" = dplyr::if_else(is.na(.data$driverPracticeAvgPerc) , 0, .data$driverPracticeAvgPerc),
+      "constructorPracticeBestPerc" = dplyr::if_else(is.na(.data$constructorPracticeBestPerc) , 0, .data$constructorPracticeBestPerc),
+      "constructorPracticeAvgPerc" = dplyr::if_else(is.na(.data$constructorPracticeAvgPerc) , 0, .data$constructorPracticeAvgPerc),
+      "driverTeamPracticeAvgGapPerc" = dplyr::if_else(is.na(.data$driverTeamPracticeAvgGapPerc) , 0, .data$driverTeamPracticeAvgGapPerc)
+    )
     dplyr::select(c(
       "driverId", "constructorId", "raceId",
       "driverPercPracticeLaps", "constructorPercPracticeLaps",
@@ -433,6 +553,12 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
       TRUE ~ NA_real_
     )) %>%
     dplyr::rename("qPosition" = "position") %>%
+    dplyr::group_by(.data$raceId) %>%
+    dplyr::mutate(
+      "qGapPerc" = dplyr::if_else(is.na(.data$qGapPerc), 0, .data$qGapPerc),
+      "qPosition" = dplyr::if_else(is.na(.data$qPosition), seq(max(.data$qPosition, na.rm=F)+1, dplyr::n()))
+    ) %>%
+    dplyr::ungroup() %>%
     dplyr::select(c("raceId", "driverId", "constructorId", "qPosition", "qGapPerc"))
 
   # -------- Results ----------------------------------
@@ -448,6 +574,8 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
       "tireFailure" = dplyr::if_else(.data$statusId %in% c(27, 29), 1, 0),
       "disqualified" = dplyr::if_else(.data$statusId %in% c(2), 1, 0)
     ) %>%
+    # fix position == NA for non-finishers - change to 0?
+    dplyr::mutate("position" = dplyr::if_else(is.na(.data$position), 0L, .data$position)) %>%
     dplyr::group_by(.data$driverId) %>%
     dplyr::mutate(
       "driverCrashRate" = ewma(.data$driverCrash, driverCrashEWMA),
@@ -457,72 +585,77 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     ) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId) %>%
-    dplyr::mutate("gridPosCor" = cor(.data$grid, .data$positionOrder)) %>%
+    dplyr::mutate("gridPosCor" = stats::cor(.data$grid, .data$positionOrder)) %>%
     dplyr::ungroup() %>%
     dplyr::rename("finishingTime" = "time") %>%
     dplyr::select(c(
       "raceId", "driverId", "constructorId", "grid", "position", "positionOrder",
-      #' status','driverCrash', 'carFailure', 'tireFailure', 'disqualified',
+      'status','driverCrash', 'carFailure', 'tireFailure', 'disqualified',
       "driverCrashRate", "carFailureRate", "tireFailureRate", "disqualifiedRate", "gridPosCor"
     ))
 
   # -------- Circuits ---------------------------------
   logger::log_info("Manipulating Circuits")
   circuits <- f1model::circuits %>%
-    dplyr::select(c("circuitId", "name", "alt", "length", "type", "direction")) %>%
+    dplyr::select(c("circuitId", "name", "country", "alt", "length", "type", "direction", "nationality")) %>%
     dplyr::rename(
       "circuitName" = "name", "circuitAltitude" = "alt", "circuitLength" = "length",
-      "circuitType" = "type", "circuitDirection" = "direction"
+      "circuitType" = "type", "circuitDirection" = "direction", "circuitNationality" = "nationality",
     )
 
-  # -------- Races ------------------
+  # -------- Races ------------------------------------
   logger::log_info("Races")
-  modeldata <- f1model::races %>%
+  races <- f1model::races %>%
     dplyr::mutate("date" = as.Date(.data$date)) %>%
     dplyr::arrange(date) %>%
     dplyr::filter(.data$date > as.Date("1999-12-31")) %>%
     dplyr::mutate(
-      "safetyCars" = dplyr::if_else(is.na(.data$safetyCars), 0, .data$safetyCars),
-      "safetyCarLaps" = dplyr::if_else(is.na(.data$safetyCarLaps), 0, .data$safetyCarLaps)
+      "safetyCars" = dplyr::if_else(is.na(.data$safetyCars), 0L, .data$safetyCars),
+      "safetyCarLaps" = dplyr::if_else(is.na(.data$safetyCarLaps), 0L, .data$safetyCarLaps)
     ) %>%
     dplyr::select(c(
       "raceId", "year", "round", "circuitId", "name", "date", "weather",
       "safetyCars", "safetyCarLaps", "f1RaceId"
     )) %>%
     # Previous Race Determination
-    dplyr::mutate("lastRaceId" = dplyr::if_else(.data$round > 1,
-      races[races$round == .data$round - 1 & races$year == .data$year, ]$raceId,
-      NA_real_
-    )) %>%
+    dplyr::mutate("lastRaceId" = dplyr::lag(.data$raceId, n=1),
+                  "lastRaceId" = dplyr::if_else(.data$round == 1, NA_integer_, .data$lastRaceId)) %>%
     # solve circuit avg # safety cars
     dplyr::group_by(.data$circuitId) %>%
     dplyr::mutate(
       "avgSafetyCar" = cumsum(.data$safetyCars > 0) / seq_along(.data$safetyCars),
       "avgSafetyCarPerRace" = dplyr::cummean(.data$safetyCars)
     ) %>%
-    dplyr::ungroup() %>%
+    dplyr::ungroup()
+
+  # -------- Merges -----------------------------------
+  logger::log_info("Merging Data and performing complex calculations")
+  model_data <- races %>%
     # merge in results, drivers, constructors, circuits
-    dplyr::full_join(results, by = c("raceId")) %>%
+    dplyr::left_join(results, by = c("raceId")) %>%
     dplyr::left_join(drivers, by = c("driverId")) %>%
     dplyr::left_join(constructors, by = c("constructorId")) %>%
     dplyr::left_join(circuits, by = c("circuitId")) %>%
     dplyr::left_join(practices, by = c("raceId", "driverId", "constructorId")) %>%
     # solve driver's age at race
-    dplyr::mutate("driverAge" = lubridate::time_length(difftime(as.Date(.data$date), as.Date(.data$dob)), units = "years")) %>%
+    dplyr::mutate("driverAge" = lubridate::time_length(difftime(as.Date(.data$date), as.Date(.data$driverDOB)), unit = "years")) %>%
+    # solve driver/constructor home race
+    dplyr::mutate("driverHomeRace" = dplyr::if_else(.data$driverNationality == .data$circuitNationality, 1, 0),
+                  "constructorHomeRace" = dplyr::if_else(.data$constructorNationality == .data$circuitNationality, 1, 0))%>%
     # solve number of races per driver
     dplyr::group_by(.data$driverId) %>%
     dplyr::mutate("driverGPExperience" = seq.int(0, dplyr::n() - 1)) %>%
     dplyr::ungroup() %>%
     # Add Qualifying Data
-    dplyr::left_join(quali, by = c("raceId", "driverId", "constructorId", "currentConstructorId")) %>%
-    # Add Driver & constructor Points Going In
-    dplyr::left_join(driver_standings, by = c("previousRaceId" = "raceId", "driverId" = "driverId")) %>%
-    dplyr::left_join(constructor_standings, by = c("previousRaceId" = "raceId", "constructorId" = "constructorId")) %>%
+    dplyr::left_join(quali, by = c("raceId", "driverId", "constructorId")) %>%
+    # Add Driver & constructor Points Going In. lastRaceId = raceId to lag the points to the poitns incoming to a race.
+    dplyr::left_join(driver_standings, by = c("lastRaceId" = "raceId", "driverId" = "driverId")) %>%
+    dplyr::left_join(constructor_standings, by = c("lastRaceId" = "raceId", "constructorId" = "constructorId")) %>%
     dplyr::mutate(
       "driverPoints" = dplyr::if_else(is.na(.data$driverPoints), 0, .data$driverPoints),
       "constructorPoints" = dplyr::if_else(is.na(.data$constructorPoints), 0, .data$constructorPoints),
-      "driverSeasonWins" = dplyr::if_else(is.na(.data$driverSeasonWins), 0, .data$driverSeasonWins),
-      "constructorSeasonWins" = dplyr::if_else(is.na(.data$constructorSeasonWins), 0, .data$constructorSeasonWins)
+      "driverSeasonWins" = dplyr::if_else(is.na(.data$driverSeasonWins), 0L, .data$driverSeasonWins),
+      "constructorSeasonWins" = dplyr::if_else(is.na(.data$constructorSeasonWins), 0L, .data$constructorSeasonWins)
     ) %>%
     dplyr::group_by(.data$raceId) %>%
     dplyr::mutate(
@@ -530,12 +663,56 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
       "constructorPointsPerc" = dplyr::if_else(.data$round == 1, 0, .data$constructorPoints / max(.data$constructorPoints, na.rm = T)),
       "driverSeasonWinsPerc" = dplyr::if_else(.data$round == 1, 0, .data$driverSeasonWins / max(.data$driverSeasonWins, na.rm = T)),
       "constructorSeasonWinsPerc" = dplyr::if_else(.data$round == 1, 0, .data$constructorSeasonWins / max(.data$constructorSeasonWins, na.rm = T)),
-      "previousRaceIdAtCircuit" = dplyr::lag(.data$raceId, n = 1),
-      "previousRaceGridPosCor" = .data[.data$raceId == .data$previousRaceIdAtCircuit, "gridPosCor"][1],
-      "avgGridPosCor" = ewma(.data$previousRaceGridPosCor, gridPositionCorEWMA)
+      "avgGridPosCor" = ewma_drop(.data$gridPosCor, gridPositionCorEWMA)
+    ) %>%
+    dplyr::mutate(
+      "driverPointsPerc" = dplyr::if_else(is.na(.data$driverPointsPerc), 0, .data$driverPointsPerc),
+      "constructorPointsPerc" = dplyr::if_else(is.na(.data$constructorPointsPerc), 0, .data$constructorPointsPerc),
+      "driverSeasonWinsPerc" = dplyr::if_else(is.na(.data$driverSeasonWinsPerc), 0, .data$driverSeasonWinsPerc),
+      "constructorSeasonWinsPerc" = dplyr::if_else(is.na(.data$constructorSeasonWinsPerc), 0, .data$constructorSeasonWinsPerc)
     ) %>%
     dplyr::ungroup()
 
+  gpcs<-model_data %>%
+    dplyr::group_by(.data$circuitType) %>%
+    dplyr::summarise("meanGridPosCor" = mean(.data$gridPosCor))
+
+  model_data <- model_data %>%
+    dplyr::mutate(
+      "avgGridPosCor" = dplyr::if_else(!is.na(.data$avgGridPosCor), .data$avgGridPosCor,
+                                       dplyr::case_when(
+                                         .data$circuitType == 'race' ~ gpcs[gpcs$circuitType == 'race',]$meanGridPosCor,
+                                         .data$circuitType == 'street' ~ gpcs[gpcs$circuitType == 'street',]$meanGridPosCor,
+                                         TRUE ~ mean(gpcs$meanGridPosCor)))) %>%
+    dplyr::select(c(
+      #ID columns
+      "raceId", "circuitId", "driverId", "currentConstructorId",
+      #race metadata
+      "year", "round", "name", "date",
+      #race info
+      "weather", "safetyCars", "safetyCarLaps", "avgSafetyCar", "avgSafetyCarPerRace",
+      #race data
+      "grid", "position", "positionOrder", "driverCrashRate", "carFailureRate", "tireFailureRate",
+      "disqualifiedRate",
+      #driver data
+      "driverName", "driverDOB", "driverNationality", "driverAge", "driverGPExperience",
+      "driverSeasonWins", "driverSeasonWinsPerc", "driverPoints", "driverPointsPerc", "driverHomeRace",
+      #constructor data
+      "constructorName", "constructorNationality", "constructorPoints", "constructorSeasonWins",
+      "constructorPointsPerc", "constructorSeasonWinsPerc", "constructorHomeRace",
+      #circuit data
+      "circuitName", "circuitAltitude", "circuitLength", "circuitType", "circuitDirection",
+      "circuitNationality", "avgGridPosCor",
+      #quali data
+      "qPosition", "qGapPerc",
+      #practice data
+      "driverPercPracticeLaps", "constructorPercPracticeLaps", "driverPracticeBestPerc", "driverPracticeAvgPerc",
+      "constructorPracticeBestPerc", "constructorPracticeAvgPerc", "driverTeamPracticeAvgGapPerc"
+      ))
+
+
+
+  return(model_data)
 
 
 
