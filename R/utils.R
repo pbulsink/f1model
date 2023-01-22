@@ -49,9 +49,9 @@ ewma <- function(x, a) {
   return(s)
 }
 
-ewma_drop<-function(x, a){
-  if(length(x) > 1){
-    e<-ewma(x[-length(x)], a)
+ewma_drop <- function(x, a) {
+  if (length(x) > 1) {
+    e <- ewma(x[-length(x)], a)
     return(c(NA, e))
   } else {
     return(NA)
