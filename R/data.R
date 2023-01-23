@@ -513,13 +513,13 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
       "constructorPracticeAvgPerc" = tidyr::replace_na(.data$constructorPracticeAvgPerc, 1.10),
       "driverTeamPracticeAvgGapPerc" = tidyr::replace_na(.data$driverTeamPracticeAvgGapPerc, 1)
     ) %>%
-  dplyr::select(c(
-    "driverId", "constructorId", "raceId",
-    "driverPercPracticeLaps", "constructorPercPracticeLaps",
-    "driverPracticeBestPerc", "driverPracticeAvgPerc",
-    "constructorPracticeBestPerc", "constructorPracticeAvgPerc",
-    "driverTeamPracticeAvgGapPerc"
-  )) %>%
+    dplyr::select(c(
+      "driverId", "constructorId", "raceId",
+      "driverPercPracticeLaps", "constructorPercPracticeLaps",
+      "driverPracticeBestPerc", "driverPracticeAvgPerc",
+      "constructorPracticeBestPerc", "constructorPracticeAvgPerc",
+      "driverTeamPracticeAvgGapPerc"
+    )) %>%
     dplyr::distinct()
 
 
@@ -551,13 +551,13 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
       !is.na(.data$q3GapSec) ~ .data$q3GapSec,
       !is.na(.data$q2GapSec) ~ .data$q2GapSec,
       !is.na(.data$q1GapSec) ~ .data$q1GapSec,
-      TRUE ~ max(min(.data$q1Sec)*.10, max(.data$q1Sec)+1)
+      TRUE ~ max(min(.data$q1Sec) * .10, max(.data$q1Sec) + 1)
     )) %>%
     dplyr::mutate("qGapPerc" = dplyr::case_when(
       !is.na(.data$q3GapPerc) ~ .data$q3GapPerc,
       !is.na(.data$q2GapPerc) ~ .data$q2GapPerc,
       !is.na(.data$q1GapPerc) ~ .data$q1GapPerc,
-      TRUE ~ max(1.10, max(.data$q1GapPerc)+0.02)
+      TRUE ~ max(1.10, max(.data$q1GapPerc) + 0.02)
     )) %>%
     dplyr::ungroup() %>%
     dplyr::rename("qPosition" = "position") %>%
@@ -665,7 +665,7 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     dplyr::mutate(
       "qPosition" = dplyr::if_else(is.na(.data$qPosition), .data$grid, .data$qPosition),
       "qGapPerc" = dplyr::if_else(is.na(.data$qGapPerc), max(.data$qGapPerc + 0.02, 1.10), .data$qGapPerc)
-      ) %>%
+    ) %>%
     dplyr::ungroup() %>%
     # Add Driver & constructor Points Going In. lastRaceId = raceId to lag the points to the poitns incoming to a race.
     dplyr::left_join(driver_standings, by = c("lastRaceId" = "raceId", "driverId" = "driverId")) %>%
@@ -674,7 +674,7 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
       "driverPoints" = tidyr::replace_na(.data$driverPoints, 0),
       "constructorPoints" = tidyr::replace_na(.data$constructorPoints, 0),
       "driverSeasonWins" = tidyr::replace_na(.data$driverSeasonWins, 0),
-      "constructorSeasonWins" = tidyr::replace_na(.data$constructorSeasonWins,0)
+      "constructorSeasonWins" = tidyr::replace_na(.data$constructorSeasonWins, 0)
     ) %>%
     dplyr::group_by(.data$raceId) %>%
     dplyr::mutate(
@@ -693,13 +693,13 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
 
   gridCor <- model_data %>%
     dplyr::group_by(.data$raceId) %>%
-    dplyr::summarise("gridPosCor" = mean(.data$gridPosCor, na.rm=T), "circuitId" = .data$circuitId) %>%
+    dplyr::summarise("gridPosCor" = mean(.data$gridPosCor, na.rm = T), "circuitId" = .data$circuitId) %>%
     dplyr::distinct() %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$circuitId) %>%
     dplyr::mutate("avgGridPosCor" = ewma_drop(.data$gridPosCor, gridPositionCorEWMA)) %>%
     dplyr::ungroup() %>%
-    dplyr::select(c('raceId', 'avgGridPosCor'))
+    dplyr::select(c("raceId", "avgGridPosCor"))
 
   gpcs <- model_data %>%
     dplyr::group_by(.data$circuitType) %>%
@@ -741,39 +741,41 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
       "driverPercPracticeLaps", "constructorPercPracticeLaps", "driverPracticeBestPerc", "driverPracticeAvgPerc",
       "constructorPracticeBestPerc", "constructorPracticeAvgPerc", "driverTeamPracticeAvgGapPerc"
     )) %>%
-    dplyr::mutate("driverPercPracticeLaps" = tidyr::replace_na(.data$driverPercPracticeLaps, 0),
-                  "constructorPercPracticeLaps" = tidyr::replace_na(.data$constructorPercPracticeLaps, 0),
-                  "driverPracticeBestPerc" = tidyr::replace_na(.data$driverPracticeBestPerc, 1.10),
-                  "driverPracticeAvgPerc" = tidyr::replace_na(.data$driverPracticeAvgPerc, 1.10),
-                  "constructorPracticeBestPerc" = tidyr::replace_na(.data$constructorPracticeBestPerc, 1.10),
-                  "constructorPracticeAvgPerc" = tidyr::replace_na(.data$constructorPracticeAvgPerc, 1.10),
-                  "driverTeamPracticeAvgGapPerc" = tidyr::replace_na(.data$driverTeamPracticeAvgGapPerc, 1),
-                  "qGapPerc" = tidyr::replace_na(.data$qGapPerc, 1.10))
+    dplyr::mutate(
+      "driverPercPracticeLaps" = tidyr::replace_na(.data$driverPercPracticeLaps, 0),
+      "constructorPercPracticeLaps" = tidyr::replace_na(.data$constructorPercPracticeLaps, 0),
+      "driverPracticeBestPerc" = tidyr::replace_na(.data$driverPracticeBestPerc, 1.10),
+      "driverPracticeAvgPerc" = tidyr::replace_na(.data$driverPracticeAvgPerc, 1.10),
+      "constructorPracticeBestPerc" = tidyr::replace_na(.data$constructorPracticeBestPerc, 1.10),
+      "constructorPracticeAvgPerc" = tidyr::replace_na(.data$constructorPracticeAvgPerc, 1.10),
+      "driverTeamPracticeAvgGapPerc" = tidyr::replace_na(.data$driverTeamPracticeAvgGapPerc, 1),
+      "qGapPerc" = tidyr::replace_na(.data$qGapPerc, 1.10)
+    )
 
   return(model_data)
 }
 
-buildQualiModel <- function(model_data = combineData()){
+buildQualiModel <- function(model_data = combineData()) {
   # Thin Data
   model_data <- model_data %>%
     dplyr::select(c(
-      #ID columns
+      # ID columns
       "raceId", "circuitId", "driverId", "currentConstructorId",
-      #quali data (TARGET)
+      # quali data (TARGET)
       "qPosition",
-      #driver data
-      "driverDOB", "driverAge", "driverGPExperience","driverSeasonWins",
+      # driver data
+      "driverDOB", "driverAge", "driverGPExperience", "driverSeasonWins",
       "driverSeasonWinsPerc", "driverPoints", "driverPointsPerc", "driverHomeRace",
-      #constructor data
+      # constructor data
       "constructorPoints", "constructorSeasonWins", "constructorPointsPerc",
       "constructorSeasonWinsPerc", "constructorHomeRace",
-      #circuit data
+      # circuit data
       "circuitAltitude", "circuitLength", "circuitType", "circuitDirection",
-      #practice data
+      # practice data
       "driverPercPracticeLaps", "constructorPercPracticeLaps", "driverPracticeBestPerc", "driverPracticeAvgPerc",
       "constructorPracticeBestPerc", "constructorPracticeAvgPerc", "driverTeamPracticeAvgGapPerc"
     )) %>%
-  dplyr::mutate("qPosition" = as.character(.data$qPosition))
+    dplyr::mutate("qPosition" = as.character(.data$qPosition))
 
   # Split data
   splitdata <- rsample::initial_split(model_data, 0.8)
@@ -797,6 +799,5 @@ buildQualiModel <- function(model_data = combineData()){
 
   cv <- rsample::vfold_cv(training_data)
 
-  tune1<-tune::tune_grid(tune_wf, resamples = cv, grid = 50)
-
+  tune1 <- tune::tune_grid(tune_wf, resamples = cv, grid = 50)
 }
