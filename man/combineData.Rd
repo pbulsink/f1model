@@ -23,6 +23,9 @@ combineData(
 
 \item{gridPositionCorEWMA}{How much one race impacts driver's moving average of crash rate}
 }
+\value{
+a tibble with tons of data
+}
 \description{
 merge all of the data frames into one big one for use in modelling. EWMA parameters provided
 help with determining the strength of the exponential weighted moving average for those parameters.

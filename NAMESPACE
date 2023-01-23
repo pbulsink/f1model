@@ -2,5 +2,6 @@
 
 export("%>%")
 export(.data)
+export(combineData)
 importFrom(magrittr,"%>%")
 importFrom(rlang,.data)

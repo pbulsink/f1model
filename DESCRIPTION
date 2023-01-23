@@ -19,7 +19,13 @@ Imports:
     magrittr,
     RCurl,
     rlang,
-    rvest
+    rvest,
+    tidyr,
+    workflows,
+    recipes,
+    tune,
+    rsample,
+    parsnip
 Remotes:
     SCasanova/f1dataR
 Suggests: 
