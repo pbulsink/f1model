@@ -25,7 +25,9 @@ Imports:
     recipes,
     tune,
     rsample,
-    parsnip
+    parsnip,
+    doParallel,
+    dials
 Remotes:
     SCasanova/f1dataR
 Suggests: 

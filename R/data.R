@@ -426,33 +426,33 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
   # steps.
 
   # -------- Drivers ----------------------------------
-  logger::log_info("Manipulating Drivers")
+  logger::log_info("Manipulating Drivers data")
   drivers <- f1model::drivers %>%
     dplyr::mutate("driverName" = paste(.data$forename, .data$surname)) %>%
     dplyr::select(c("driverId", "code", "driverName", "dob", "nationality")) %>%
     dplyr::rename("driverCode" = "code", "driverDOB" = "dob", "driverNationality" = "nationality")
 
   # -------- Driver Standings -------------------------
-  logger::log_info("Manipulating Drivers Standings")
+  logger::log_info("Manipulating Drivers Standings data")
   driver_standings <- f1model::driver_standings %>%
     dplyr::select(c("raceId", "driverId", "points", "wins")) %>%
     dplyr::rename("driverSeasonWins" = "wins", "driverPoints" = "points")
 
   # -------- Constructors -----------------------------
-  logger::log_info("Manipulating Constructors")
+  logger::log_info("Manipulating Constructors data")
   constructors <- f1model::constructors %>%
     dplyr::mutate("currentConstructorId" = updateConstructor(.data$constructorId)) %>%
     dplyr::select(c("constructorId", "name", "nationality", "currentConstructorId")) %>%
     dplyr::rename(c("constructorName" = "name", "constructorNationality" = "nationality"))
 
   # -------- Constructor Standings --------------------
-  logger::log_info("Manipulating Constructors Standings")
+  logger::log_info("Manipulating Constructors Standings data")
   constructor_standings <- f1model::constructor_standings %>%
     dplyr::select(c("raceId", "constructorId", "points", "wins")) %>%
     dplyr::rename("constructorSeasonWins" = "wins", "constructorPoints" = "points")
 
   # -------- Practices --------------------------------
-  logger::log_info("Manipulating Practices")
+  logger::log_info("Manipulating Practice data")
   practices <- f1model::practices %>%
     dplyr::mutate(
       "practiceTimeSec" = timeToSec(.data$time),
@@ -524,7 +524,7 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
 
 
   # -------- Quali ------------------------------------
-  logger::log_info("Manipulating Qualis")
+  logger::log_info("Manipulating Quali data")
   quali <- f1model::qualifying %>%
     dplyr::mutate(
       "q1" = dplyr::if_else(.data$q1 == "\\N" | .data$q1 == "", NA_character_, .data$q1),
@@ -570,7 +570,7 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     dplyr::distinct()
 
   # -------- Results ----------------------------------
-  logger::log_info("Manipulating Results")
+  logger::log_info("Manipulating Result data")
   results <- f1model::results %>%
     dplyr::mutate(
       # "currentConstructorId" = updateConstructor(.data$constructorId),
@@ -604,7 +604,7 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     dplyr::distinct()
 
   # -------- Circuits ---------------------------------
-  logger::log_info("Manipulating Circuits")
+  logger::log_info("Manipulating Circuit data")
   circuits <- f1model::circuits %>%
     dplyr::select(c("circuitId", "name", "country", "alt", "length", "type", "direction", "nationality")) %>%
     dplyr::rename(
@@ -613,7 +613,7 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
     )
 
   # -------- Races ------------------------------------
-  logger::log_info("Races")
+  logger::log_info("Manipulating Races data")
   races <- f1model::races %>%
     dplyr::mutate("date" = as.Date(.data$date)) %>%
     dplyr::arrange(date) %>%
@@ -755,7 +755,7 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
   return(model_data)
 }
 
-buildQualiModel <- function(model_data = combineData()) {
+buildQualiModel_rf <- function(model_data = combineData()) {
   # Thin Data
   model_data <- model_data %>%
     dplyr::select(c(
@@ -775,6 +775,8 @@ buildQualiModel <- function(model_data = combineData()) {
       "driverPercPracticeLaps", "constructorPercPracticeLaps", "driverPracticeBestPerc", "driverPracticeAvgPerc",
       "constructorPracticeBestPerc", "constructorPracticeAvgPerc", "driverTeamPracticeAvgGapPerc"
     )) %>%
+    dplyr::filter(.data$qPosition > 0) %>%
+    dplyr::filter(.data$qPosition <= 20) %>%
     dplyr::mutate("qPosition" = as.character(.data$qPosition))
 
   # Split data
@@ -799,5 +801,195 @@ buildQualiModel <- function(model_data = combineData()) {
 
   cv <- rsample::vfold_cv(training_data)
 
-  tune1 <- tune::tune_grid(tune_wf, resamples = cv, grid = 50)
+  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F)-2)
+  model_res <- tune::tune_grid(tune_wf, resamples = cv, grid = 50)
+  doParallel::stopImplicitCluster()
+
+  best_model<-tune::select_best(model_res, 'roc_auc')
+
+  final_model<-tune_wf %>%
+    tune::finalize_workflow(best_model) %>%
+    parsnip::fit(data = training_data)
+
+  last_fit<- final_model %>%
+    tune::last_fit(splitdata)
+
+  #This isn't used but checks for fails.
+  test_fit <- final_model %>%
+    stats::predict(new_data = test_data)
+
+  train_roc <- tune::show_best(model_res, metric = 'roc_auc', n=1)$mean
+  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == 'roc_auc',]$.estimate
+
+  logger::log_info(glue::glue("Returning random forest model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
+                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)))
+  return(final_model)
+}
+
+buildQualiModel_glm <- function(model_data = combineData()) {
+  # Thin Data
+  model_data <- model_data %>%
+    dplyr::select(c(
+      # ID columns
+      "raceId", "circuitId", "driverId", "currentConstructorId",
+      # quali data (TARGET)
+      "qPosition",
+      # driver data
+      "driverAge", "driverGPExperience", "driverSeasonWins",
+      "driverSeasonWinsPerc", "driverPoints", "driverPointsPerc", "driverHomeRace",
+      # constructor data
+      "constructorPoints", "constructorSeasonWins", "constructorPointsPerc",
+      "constructorSeasonWinsPerc", "constructorHomeRace",
+      # circuit data
+      "circuitAltitude", "circuitLength", "circuitType", "circuitDirection",
+      # practice data
+      "driverPercPracticeLaps", "constructorPercPracticeLaps", "driverPracticeBestPerc", "driverPracticeAvgPerc",
+      "constructorPracticeBestPerc", "constructorPracticeAvgPerc", "driverTeamPracticeAvgGapPerc"
+    )) %>%
+    dplyr::filter(.data$qPosition > 0) %>%
+    dplyr::filter(.data$qPosition <= 20) %>%
+    dplyr::mutate("qPosition" = as.character(.data$qPosition))
+
+  # Split data
+  splitdata <- rsample::initial_split(model_data, 0.8)
+  training_data <- rsample::training(splitdata)
+  test_data <- rsample::testing(splitdata)
+
+  tune_spec <- parsnip::multinom_reg(
+    penalty = tune::tune(),
+    mixture = tune::tune()
+  ) %>%
+    parsnip::set_mode('classification') %>%
+    parsnip::set_engine('glmnet')
+
+  init_recipe <- recipes::recipe(qPosition ~ ., training_data) %>%
+    recipes::update_role("raceId", new_role = "ID") %>%
+    recipes::update_role("circuitId", new_role = "ID") %>%
+    recipes::update_role("driverId", new_role = "ID") %>%
+    recipes::update_role("currentConstructorId", new_role = "ID") %>%
+    recipes::step_string2factor(c("circuitType", "circuitDirection")) %>%
+    recipes::step_dummy(recipes::all_nominal_predictors())
+
+  tune_wf <- workflows::workflow() %>%
+    workflows::add_recipe(init_recipe) %>%
+    workflows::add_model(tune_spec)
+
+  cv <- rsample::vfold_cv(training_data)
+
+  grid <- dials::grid_max_entropy(
+    dials::penalty(),
+    dials::mixture(),
+    size = 30
+  )
+
+  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F)-2)
+  model_res<-tune::tune_grid(tune_wf,
+                             resamples = cv,
+                             grid = grid,
+                             control = tune::control_grid(save_pred = TRUE, verbose = TRUE))
+  doParallel::stopImplicitCluster()
+
+  best_model<-tune::select_best(model_res, 'roc_auc')
+
+  final_model<-tune_wf %>%
+    tune::finalize_workflow(best_model) %>%
+    parsnip::fit(data = training_data)
+
+  last_fit<- final_model %>%
+    tune::last_fit(splitdata)
+
+  #This isn't used but checks for fails.
+  test_fit <- final_model %>%
+    stats::predict(new_data = test_data)
+
+  train_roc <- tune::show_best(model_res, metric = 'roc_auc', n=1)$mean
+  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == 'roc_auc',]$.estimate
+
+  logger::log_info(glue::glue("Returning logistic model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
+                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)))
+  return(final_model)
+}
+
+buildQualiModel_svm <- function(model_data = combineData()) {
+  # Thin Data
+  model_data <- model_data %>%
+    dplyr::select(c(
+      # ID columns
+      "raceId", "circuitId", "driverId", "currentConstructorId",
+      # quali data (TARGET)
+      "qPosition",
+      # driver data
+      "driverAge", "driverGPExperience", "driverSeasonWins",
+      "driverSeasonWinsPerc", "driverPoints", "driverPointsPerc", "driverHomeRace",
+      # constructor data
+      "constructorPoints", "constructorSeasonWins", "constructorPointsPerc",
+      "constructorSeasonWinsPerc", "constructorHomeRace",
+      # circuit data
+      "circuitAltitude", "circuitLength", "circuitType", "circuitDirection",
+      # practice data
+      "driverPercPracticeLaps", "constructorPercPracticeLaps", "driverPracticeBestPerc", "driverPracticeAvgPerc",
+      "constructorPracticeBestPerc", "constructorPracticeAvgPerc", "driverTeamPracticeAvgGapPerc"
+    )) %>%
+    dplyr::filter(.data$qPosition > 0) %>%
+    dplyr::filter(.data$qPosition <= 20) %>%
+    dplyr::mutate("qPosition" = as.character(.data$qPosition))
+
+  # Split data
+  splitdata <- rsample::initial_split(model_data, 0.8)
+  training_data <- rsample::training(splitdata)
+  test_data <- rsample::testing(splitdata)
+
+  tune_spec <- parsnip::svm_rbf(cost = tune::tune(), rbf_sigma = tune::tune()) %>%
+    parsnip::set_mode('classification') %>%
+    parsnip::set_engine('kernlab')
+
+  init_recipe <- recipes::recipe(qPosition ~ ., training_data) %>%
+    recipes::update_role("raceId", new_role = "ID") %>%
+    recipes::update_role("circuitId", new_role = "ID") %>%
+    recipes::update_role("driverId", new_role = "ID") %>%
+    recipes::update_role("currentConstructorId", new_role = "ID") %>%
+    recipes::step_string2factor(c("circuitType", "circuitDirection")) %>%
+    recipes::step_dummy(recipes::all_nominal_predictors()) %>%
+    recipes::step_normalize(recipes::all_numeric()) %>%
+    recipes::step_zv(recipes::all_predictors()) %>%
+    recipes::step_center(recipes::all_predictors())
+
+  tune_wf <- workflows::workflow() %>%
+    workflows::add_recipe(init_recipe) %>%
+    workflows::add_model(tune_spec)
+
+  cv <- rsample::vfold_cv(training_data)
+
+  grid <- dials::grid_max_entropy(
+    dials::cost(),
+    dials::rbf_sigma(),
+    size = 30
+  )
+
+  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F)-2)
+  model_res<-tune::tune_grid(tune_wf,
+                             resamples = cv,
+                             grid = grid,
+                             control = tune::control_grid(save_pred = TRUE, verbose = TRUE))
+  doParallel::stopImplicitCluster()
+
+  best_model<-tune::select_best(model_res, 'roc_auc')
+
+  final_model<-tune_wf %>%
+    tune::finalize_workflow(best_model) %>%
+    parsnip::fit(data = training_data)
+
+  last_fit<- final_model %>%
+    tune::last_fit(splitdata)
+
+  #This isn't used but checks for fails.
+  test_fit <- final_model %>%
+    stats::predict(new_data = test_data)
+
+  train_roc <- tune::show_best(model_res, metric = 'roc_auc', n=1)$mean
+  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == 'roc_auc',]$.estimate
+
+  logger::log_info(glue::glue("Returning svm model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
+                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)))
+  return(final_model)
 }
