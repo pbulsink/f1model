@@ -801,28 +801,29 @@ buildQualiModel_rf <- function(model_data = combineData()) {
 
   cv <- rsample::vfold_cv(training_data)
 
-  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F)-2)
+  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
   model_res <- tune::tune_grid(tune_wf, resamples = cv, grid = 50)
   doParallel::stopImplicitCluster()
 
-  best_model<-tune::select_best(model_res, 'roc_auc')
+  best_model <- tune::select_best(model_res, "roc_auc")
 
-  final_model<-tune_wf %>%
+  final_model <- tune_wf %>%
     tune::finalize_workflow(best_model) %>%
     parsnip::fit(data = training_data)
 
-  last_fit<- final_model %>%
+  last_fit <- final_model %>%
     tune::last_fit(splitdata)
 
-  #This isn't used but checks for fails.
+  # This isn't used but checks for fails.
   test_fit <- final_model %>%
     stats::predict(new_data = test_data)
 
-  train_roc <- tune::show_best(model_res, metric = 'roc_auc', n=1)$mean
-  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == 'roc_auc',]$.estimate
+  train_roc <- tune::show_best(model_res, metric = "roc_auc", n = 1)$mean
+  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == "roc_auc", ]$.estimate
 
   logger::log_info(glue::glue("Returning random forest model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
-                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)))
+    roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
+  ))
   return(final_model)
 }
 
@@ -859,8 +860,8 @@ buildQualiModel_glm <- function(model_data = combineData()) {
     penalty = tune::tune(),
     mixture = tune::tune()
   ) %>%
-    parsnip::set_mode('classification') %>%
-    parsnip::set_engine('glmnet')
+    parsnip::set_mode("classification") %>%
+    parsnip::set_engine("glmnet")
 
   init_recipe <- recipes::recipe(qPosition ~ ., training_data) %>%
     recipes::update_role("raceId", new_role = "ID") %>%
@@ -882,31 +883,33 @@ buildQualiModel_glm <- function(model_data = combineData()) {
     size = 30
   )
 
-  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F)-2)
-  model_res<-tune::tune_grid(tune_wf,
-                             resamples = cv,
-                             grid = grid,
-                             control = tune::control_grid(save_pred = TRUE, verbose = TRUE))
+  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
+  model_res <- tune::tune_grid(tune_wf,
+    resamples = cv,
+    grid = grid,
+    control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
+  )
   doParallel::stopImplicitCluster()
 
-  best_model<-tune::select_best(model_res, 'roc_auc')
+  best_model <- tune::select_best(model_res, "roc_auc")
 
-  final_model<-tune_wf %>%
+  final_model <- tune_wf %>%
     tune::finalize_workflow(best_model) %>%
     parsnip::fit(data = training_data)
 
-  last_fit<- final_model %>%
+  last_fit <- final_model %>%
     tune::last_fit(splitdata)
 
-  #This isn't used but checks for fails.
+  # This isn't used but checks for fails.
   test_fit <- final_model %>%
     stats::predict(new_data = test_data)
 
-  train_roc <- tune::show_best(model_res, metric = 'roc_auc', n=1)$mean
-  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == 'roc_auc',]$.estimate
+  train_roc <- tune::show_best(model_res, metric = "roc_auc", n = 1)$mean
+  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == "roc_auc", ]$.estimate
 
   logger::log_info(glue::glue("Returning logistic model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
-                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)))
+    roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
+  ))
   return(final_model)
 }
 
@@ -940,8 +943,8 @@ buildQualiModel_svm <- function(model_data = combineData()) {
   test_data <- rsample::testing(splitdata)
 
   tune_spec <- parsnip::svm_rbf(cost = tune::tune(), rbf_sigma = tune::tune()) %>%
-    parsnip::set_mode('classification') %>%
-    parsnip::set_engine('kernlab')
+    parsnip::set_mode("classification") %>%
+    parsnip::set_engine("kernlab")
 
   init_recipe <- recipes::recipe(qPosition ~ ., training_data) %>%
     recipes::update_role("raceId", new_role = "ID") %>%
@@ -966,30 +969,32 @@ buildQualiModel_svm <- function(model_data = combineData()) {
     size = 30
   )
 
-  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F)-2)
-  model_res<-tune::tune_grid(tune_wf,
-                             resamples = cv,
-                             grid = grid,
-                             control = tune::control_grid(save_pred = TRUE, verbose = TRUE))
+  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
+  model_res <- tune::tune_grid(tune_wf,
+    resamples = cv,
+    grid = grid,
+    control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
+  )
   doParallel::stopImplicitCluster()
 
-  best_model<-tune::select_best(model_res, 'roc_auc')
+  best_model <- tune::select_best(model_res, "roc_auc")
 
-  final_model<-tune_wf %>%
+  final_model <- tune_wf %>%
     tune::finalize_workflow(best_model) %>%
     parsnip::fit(data = training_data)
 
-  last_fit<- final_model %>%
+  last_fit <- final_model %>%
     tune::last_fit(splitdata)
 
-  #This isn't used but checks for fails.
+  # This isn't used but checks for fails.
   test_fit <- final_model %>%
     stats::predict(new_data = test_data)
 
-  train_roc <- tune::show_best(model_res, metric = 'roc_auc', n=1)$mean
-  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == 'roc_auc',]$.estimate
+  train_roc <- tune::show_best(model_res, metric = "roc_auc", n = 1)$mean
+  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == "roc_auc", ]$.estimate
 
   logger::log_info(glue::glue("Returning svm model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
-                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)))
+    roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
+  ))
   return(final_model)
 }
