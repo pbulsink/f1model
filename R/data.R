@@ -801,8 +801,11 @@ buildQualiModel_rf <- function(model_data = combineData()) {
 
   cv <- rsample::vfold_cv(training_data)
 
+  logger::log_info("Setting Up Parallel for rf tuning")
   doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
+  logger::log_info("Tuning RF model")
   model_res <- tune::tune_grid(tune_wf, resamples = cv, grid = 50)
+  logger::log_info("Clean up parallel")
   doParallel::stopImplicitCluster()
 
   best_model <- tune::select_best(model_res, "roc_auc")
@@ -811,6 +814,7 @@ buildQualiModel_rf <- function(model_data = combineData()) {
     tune::finalize_workflow(best_model) %>%
     parsnip::fit(data = training_data)
 
+  logger::log_info("Training final")
   last_fit <- final_model %>%
     tune::last_fit(splitdata)
 
@@ -883,12 +887,15 @@ buildQualiModel_glm <- function(model_data = combineData()) {
     size = 30
   )
 
+  logger::log_info("Setting up l for tuning glm model")
   doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
+  logger::log_info("Tuning glm model")
   model_res <- tune::tune_grid(tune_wf,
     resamples = cv,
     grid = grid,
     control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
   )
+  logger::log_info("Ending parallel")
   doParallel::stopImplicitCluster()
 
   best_model <- tune::select_best(model_res, "roc_auc")
@@ -897,6 +904,7 @@ buildQualiModel_glm <- function(model_data = combineData()) {
     tune::finalize_workflow(best_model) %>%
     parsnip::fit(data = training_data)
 
+  logger::log_info("Training glm model")
   last_fit <- final_model %>%
     tune::last_fit(splitdata)
 
@@ -969,12 +977,15 @@ buildQualiModel_svm <- function(model_data = combineData()) {
     size = 30
   )
 
+  logger::log_info("Setting up parallel for svm model")
   doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
+  logger::log_info("Tuning svm model")
   model_res <- tune::tune_grid(tune_wf,
     resamples = cv,
     grid = grid,
     control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
   )
+  logger::log_info("Ending Parallel")
   doParallel::stopImplicitCluster()
 
   best_model <- tune::select_best(model_res, "roc_auc")
@@ -983,6 +994,7 @@ buildQualiModel_svm <- function(model_data = combineData()) {
     tune::finalize_workflow(best_model) %>%
     parsnip::fit(data = training_data)
 
+  logger::log_info("Training svm model")
   last_fit <- final_model %>%
     tune::last_fit(splitdata)
 
