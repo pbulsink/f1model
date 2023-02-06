@@ -95,3 +95,10 @@ ewma_drop <- function(x, a) {
 }
 
 updateConstructor <- Vectorize(.updateConstructor, SIMPLIFY = T, USE.NAMES = F)
+
+# from StackOverflow, might help with some parallel issues when running in console?
+# https://stackoverflow.com/a/67497500/3933405
+unregister_dopar <- function() {
+  env <- foreach:::.foreachGlobals
+  rm(list=ls(name=env), pos=env)
+}

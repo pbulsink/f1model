@@ -418,8 +418,7 @@ assignDriverConstructor <- function(data, raceId) {
 #' @param gridPositionCorEWMA How much one race impacts driver's moving average of crash rate
 #'
 #' @return a tibble with tons of data
-#' @export
-combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailureEWMA = 0.05,
+.combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailureEWMA = 0.05,
                         disqualifiedEWMA = .05, gridPositionCorEWMA = 0.2) {
   # This function combines the data from the saved data sets to one
   # useful data frame for modelling. It also includes reprocessing
@@ -755,6 +754,22 @@ combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailu
   return(model_data)
 }
 
+#' Combine Data
+#'
+#' @description merge all of the data frames into one big one for use in modelling. EWMA parameters provided
+#' help with determining the strength of the exponential weighted moving average for those parameters.
+#' Note: memoised (cached), for fresh calculations use .combineData()
+#'
+#' @param driverCrashEWMA How much one race impacts driver's moving average of crash rate
+#' @param carFailureEWMA How much one race impacts constructor's moving average of failure rate
+#' @param tireFailureEWMA How much one race impacts driver's moving average of tire failure rate
+#' @param disqualifiedEWMA How much one race impacts driver's moving average of disqualified rate
+#' @param gridPositionCorEWMA How much one race impacts driver's moving average of crash rate
+#'
+#' @return a tibble with tons of data
+#' @export
+combineData<-memoise::memoise(.combineData)
+
 buildQualiModel_rf <- function(model_data = combineData()) {
   # Thin Data
   model_data <- model_data %>%
@@ -784,7 +799,10 @@ buildQualiModel_rf <- function(model_data = combineData()) {
   training_data <- rsample::training(splitdata)
   test_data <- rsample::testing(splitdata)
 
-  tune_spec <- parsnip::rand_forest(mtry = tune::tune(), min_n = tune::tune()) %>%
+  tune_spec <- parsnip::rand_forest(
+    mtry = tune::tune(),
+    min_n = tune::tune()
+    ) %>%
     parsnip::set_mode("classification") %>%
     parsnip::set_engine("ranger")
 
@@ -807,6 +825,7 @@ buildQualiModel_rf <- function(model_data = combineData()) {
   model_res <- tune::tune_grid(tune_wf, resamples = cv, grid = 50)
   logger::log_info("Clean up parallel")
   doParallel::stopImplicitCluster()
+  unregister_dopar()
 
   best_model <- tune::select_best(model_res, "roc_auc")
 
@@ -829,7 +848,7 @@ buildQualiModel_rf <- function(model_data = combineData()) {
     roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
   ))
   return(final_model)
-}
+} # slow. preprocess ok
 
 buildQualiModel_glm <- function(model_data = combineData()) {
   # Thin Data
@@ -873,7 +892,7 @@ buildQualiModel_glm <- function(model_data = combineData()) {
     recipes::update_role("driverId", new_role = "ID") %>%
     recipes::update_role("currentConstructorId", new_role = "ID") %>%
     recipes::step_string2factor(c("circuitType", "circuitDirection")) %>%
-    recipes::step_dummy(recipes::all_nominal_predictors())
+    recipes::step_dummy(recipes::all_nominal_predictors()) #%>%
 
   tune_wf <- workflows::workflow() %>%
     workflows::add_recipe(init_recipe) %>%
@@ -919,7 +938,7 @@ buildQualiModel_glm <- function(model_data = combineData()) {
     roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
   ))
   return(final_model)
-}
+} # 2 minutes. preprocess ok  ~0.71
 
 buildQualiModel_svm <- function(model_data = combineData()) {
   # Thin Data
@@ -950,7 +969,7 @@ buildQualiModel_svm <- function(model_data = combineData()) {
   training_data <- rsample::training(splitdata)
   test_data <- rsample::testing(splitdata)
 
-  tune_spec <- parsnip::svm_rbf(cost = tune::tune(), rbf_sigma = tune::tune()) %>%
+  tune_spec <- parsnip::svm_linear(cost = tune::tune()) %>%
     parsnip::set_mode("classification") %>%
     parsnip::set_engine("kernlab")
 
@@ -962,8 +981,7 @@ buildQualiModel_svm <- function(model_data = combineData()) {
     recipes::step_string2factor(c("circuitType", "circuitDirection")) %>%
     recipes::step_dummy(recipes::all_nominal_predictors()) %>%
     recipes::step_normalize(recipes::all_numeric()) %>%
-    recipes::step_zv(recipes::all_predictors()) %>%
-    recipes::step_center(recipes::all_predictors())
+    recipes::step_zv(recipes::all_predictors())
 
   tune_wf <- workflows::workflow() %>%
     workflows::add_recipe(init_recipe) %>%
@@ -973,12 +991,11 @@ buildQualiModel_svm <- function(model_data = combineData()) {
 
   grid <- dials::grid_max_entropy(
     dials::cost(),
-    dials::rbf_sigma(),
     size = 30
   )
 
   logger::log_info("Setting up parallel for svm model")
-  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
+  doParallel::registerDoParallel(cores = max(parallel::detectCores()-2,4))
   logger::log_info("Tuning svm model")
   model_res <- tune::tune_grid(tune_wf,
     resamples = cv,
@@ -987,6 +1004,7 @@ buildQualiModel_svm <- function(model_data = combineData()) {
   )
   logger::log_info("Clean up parallel")
   doParallel::stopImplicitCluster()
+  unregister_dopar()
 
   best_model <- tune::select_best(model_res, "roc_auc")
 
@@ -1009,7 +1027,7 @@ buildQualiModel_svm <- function(model_data = combineData()) {
     roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
   ))
   return(final_model)
-}
+} # reasonable. preprocess ok ~0.70
 
 buildQualiModel_xgb <- function(model_data = combineData()) {
   # Thin Data
@@ -1062,7 +1080,7 @@ buildQualiModel_xgb <- function(model_data = combineData()) {
 
   cv <- rsample::vfold_cv(training_data)
 
-  grid <- dials::dials::grid_latin_hypercube(
+  grid <- dials::grid_latin_hypercube(
     dials::trees(),
     dials::tree_depth(),
     dials::min_n(),
@@ -1075,7 +1093,7 @@ buildQualiModel_xgb <- function(model_data = combineData()) {
   )
 
   logger::log_info("Setting up parallel for xgb model")
-  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
+  doParallel::registerDoParallel(cores = 2)
   logger::log_info("Tuning xgb model")
   model_res <- tune::tune_grid(
     tune_wf,
@@ -1107,4 +1125,373 @@ buildQualiModel_xgb <- function(model_data = combineData()) {
                               roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
   ))
   return(final_model)
+} # SLOW
+
+buildQualiModel_knn <- function(model_data = combineData()) {
+  # Thin Data
+  model_data <- model_data %>%
+    dplyr::select(c(
+      # ID columns
+      "raceId", "circuitId", "driverId", "currentConstructorId",
+      # quali data (TARGET)
+      "qPosition",
+      # driver data
+      "driverAge", "driverGPExperience", "driverSeasonWins",
+      "driverSeasonWinsPerc", "driverPoints", "driverPointsPerc", "driverHomeRace",
+      # constructor data
+      "constructorPoints", "constructorSeasonWins", "constructorPointsPerc",
+      "constructorSeasonWinsPerc", "constructorHomeRace",
+      # circuit data
+      "circuitAltitude", "circuitLength", "circuitType", "circuitDirection",
+      # practice data
+      "driverPercPracticeLaps", "constructorPercPracticeLaps", "driverPracticeBestPerc", "driverPracticeAvgPerc",
+      "constructorPracticeBestPerc", "constructorPracticeAvgPerc", "driverTeamPracticeAvgGapPerc"
+    )) %>%
+    dplyr::filter(.data$qPosition > 0) %>%
+    dplyr::filter(.data$qPosition <= 20) %>%
+    dplyr::mutate("qPosition" = as.character(.data$qPosition)) %>%
+    dplyr::mutate("qPosition" = as.factor(.data$qPosition))
+
+  # Split data
+  splitdata <- rsample::initial_split(model_data, 0.8)
+  training_data <- rsample::training(splitdata)
+  test_data <- rsample::testing(splitdata)
+
+  tune_spec <- parsnip::nearest_neighbor(neighbors = tune::tune()) %>%
+    parsnip::set_mode("classification") %>%
+    parsnip::set_engine("kknn")
+
+  init_recipe <- recipes::recipe(qPosition ~ ., training_data) %>%
+    recipes::update_role("raceId", new_role = "ID") %>%
+    recipes::update_role("circuitId", new_role = "ID") %>%
+    recipes::update_role("driverId", new_role = "ID") %>%
+    recipes::update_role("currentConstructorId", new_role = "ID") %>%
+    recipes::step_string2factor(c("circuitType", "circuitDirection")) %>%
+    recipes::step_dummy(recipes::all_nominal_predictors()) %>%
+    recipes::step_normalize(recipes::all_predictors()) %>%
+    recipes::step_nzv(recipes::all_predictors())
+
+  tune_wf <- workflows::workflow() %>%
+    workflows::add_recipe(init_recipe) %>%
+    workflows::add_model(tune_spec)
+
+  cv <- rsample::vfold_cv(training_data)
+
+  grid <- dials::grid_latin_hypercube(
+    dials::neighbors()
+  )
+
+  logger::log_info("Setting up parallel for knn model")
+  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
+  logger::log_info("Tuning knn model")
+  model_res <- tune::tune_grid(
+    tune_wf,
+    resamples = cv,
+    grid = grid,
+    control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
+  )
+  logger::log_info("Clean up parallel")
+  doParallel::stopImplicitCluster()
+
+  best_model <- tune::select_best(model_res, "roc_auc")
+
+  final_model <- tune_wf %>%
+    tune::finalize_workflow(best_model) %>%
+    parsnip::fit(data = training_data)
+
+  logger::log_info("Training knn model")
+  last_fit <- final_model %>%
+    tune::last_fit(splitdata)
+
+  # This isn't used but checks for fails.
+  test_fit <- final_model %>%
+    stats::predict(new_data = test_data)
+
+  train_roc <- tune::show_best(model_res, metric = "roc_auc", n = 1)$mean
+  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == "roc_auc", ]$.estimate
+
+  logger::log_info(glue::glue("Returning knn model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
+                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
+  ))
+  return(final_model)
+} # 20s preprocess ok. ~0.60
+
+buildQualiModel_nb <- function(model_data = combineData()) {
+  # Thin Data
+  model_data <- model_data %>%
+    dplyr::select(c(
+      # ID columns
+      "raceId", "circuitId", "driverId", "currentConstructorId",
+      # quali data (TARGET)
+      "qPosition",
+      # driver data
+      "driverAge", "driverGPExperience", "driverSeasonWins",
+      "driverSeasonWinsPerc", "driverPoints", "driverPointsPerc", "driverHomeRace",
+      # constructor data
+      "constructorPoints", "constructorSeasonWins", "constructorPointsPerc",
+      "constructorSeasonWinsPerc", "constructorHomeRace",
+      # circuit data
+      "circuitAltitude", "circuitLength", "circuitType", "circuitDirection",
+      # practice data
+      "driverPercPracticeLaps", "constructorPercPracticeLaps", "driverPracticeBestPerc", "driverPracticeAvgPerc",
+      "constructorPracticeBestPerc", "constructorPracticeAvgPerc", "driverTeamPracticeAvgGapPerc"
+    )) %>%
+    dplyr::filter(.data$qPosition > 0) %>%
+    dplyr::filter(.data$qPosition <= 20) %>%
+    dplyr::mutate("qPosition" = as.character(.data$qPosition))
+
+  # Split data
+  splitdata <- rsample::initial_split(model_data, 0.8)
+  training_data <- rsample::training(splitdata)
+  test_data <- rsample::testing(splitdata)
+
+  require('discrim')
+
+  tune_spec <- parsnip::naive_Bayes(
+    smoothness = tune::tune(),
+    Laplace = tune::tune()
+  ) %>%
+    parsnip::set_mode("classification") %>%
+    parsnip::set_engine("klaR")
+
+  init_recipe <- recipes::recipe(qPosition ~ ., training_data) %>%
+    recipes::update_role("raceId", new_role = "ID") %>%
+    recipes::update_role("circuitId", new_role = "ID") %>%
+    recipes::update_role("driverId", new_role = "ID") %>%
+    recipes::update_role("currentConstructorId", new_role = "ID") %>%
+    recipes::step_string2factor(c("circuitType", "circuitDirection")) %>%
+    recipes::step_nzv()
+
+  tune_wf <- workflows::workflow() %>%
+    workflows::add_recipe(init_recipe) %>%
+    workflows::add_model(tune_spec)
+
+  cv <- rsample::vfold_cv(training_data)
+
+  grid <- dials::grid_max_entropy(
+    dials::smoothness(),
+    dials::Laplace(),
+    size = 30
+  )
+
+  logger::log_info("Setting up parallel for tuning nb model")
+  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
+  logger::log_info("Tuning nb model")
+  model_res <- tune::tune_grid(tune_wf,
+                               resamples = cv,
+                               grid = grid,
+                               control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
+  )
+  logger::log_info("Clean up parallel")
+  doParallel::stopImplicitCluster()
+
+  best_model <- tune::select_best(model_res, "roc_auc")
+
+  final_model <- tune_wf %>%
+    tune::finalize_workflow(best_model) %>%
+    parsnip::fit(data = training_data)
+
+  logger::log_info("Training nb model")
+  last_fit <- final_model %>%
+    tune::last_fit(splitdata)
+
+  # This isn't used but checks for fails.
+  test_fit <- final_model %>%
+    stats::predict(new_data = test_data)
+
+  train_roc <- tune::show_best(model_res, metric = "roc_auc", n = 1)$mean
+  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == "roc_auc", ]$.estimate
+
+  logger::log_info(glue::glue("Returning naive bayes model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
+                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
+  ))
+  return(final_model)
+} # 20 minutes - preprocess ok ~0.72
+
+buildQualiModel_dt <- function(model_data = combineData()) {
+  # Thin Data
+  model_data <- model_data %>%
+    dplyr::select(c(
+      # ID columns
+      "raceId", "circuitId", "driverId", "currentConstructorId",
+      # quali data (TARGET)
+      "qPosition",
+      # driver data
+      "driverAge", "driverGPExperience", "driverSeasonWins",
+      "driverSeasonWinsPerc", "driverPoints", "driverPointsPerc", "driverHomeRace",
+      # constructor data
+      "constructorPoints", "constructorSeasonWins", "constructorPointsPerc",
+      "constructorSeasonWinsPerc", "constructorHomeRace",
+      # circuit data
+      "circuitAltitude", "circuitLength", "circuitType", "circuitDirection",
+      # practice data
+      "driverPercPracticeLaps", "constructorPercPracticeLaps", "driverPracticeBestPerc", "driverPracticeAvgPerc",
+      "constructorPracticeBestPerc", "constructorPracticeAvgPerc", "driverTeamPracticeAvgGapPerc"
+    )) %>%
+    dplyr::filter(.data$qPosition > 0) %>%
+    dplyr::filter(.data$qPosition <= 20) %>%
+    dplyr::mutate("qPosition" = as.character(.data$qPosition))
+
+  # Split data
+  splitdata <- rsample::initial_split(model_data, 0.8)
+  training_data <- rsample::training(splitdata)
+  test_data <- rsample::testing(splitdata)
+
+  require(rules)
+
+  tune_spec <- parsnip::decision_tree(
+    cost_complexity = tune::tune(),
+    tree_depth = tune::tune()
+  ) %>%
+    parsnip::set_mode("classification") %>%
+    parsnip::set_engine("rpart")
+
+  init_recipe <- recipes::recipe(qPosition ~ ., training_data) %>%
+    recipes::update_role("raceId", new_role = "ID") %>%
+    recipes::update_role("circuitId", new_role = "ID") %>%
+    recipes::update_role("driverId", new_role = "ID") %>%
+    recipes::update_role("currentConstructorId", new_role = "ID") %>%
+    recipes::step_string2factor(c("circuitType", "circuitDirection")) %>%
+    recipes::step_nzv(recipes::all_predictors())
+
+  tune_wf <- workflows::workflow() %>%
+    workflows::add_recipe(init_recipe) %>%
+    workflows::add_model(tune_spec)
+
+  cv <- rsample::vfold_cv(training_data)
+
+  grid <- dials::grid_max_entropy(
+    dials::cost_complexity(),
+    dials::tree_depth(),
+    size = 30
+  )
+
+  logger::log_info("Setting up parallel for tuning decision tree model")
+  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
+  logger::log_info("Tuning decision tree model")
+  model_res <- tune::tune_grid(tune_wf,
+                               resamples = cv,
+                               grid = grid,
+                               control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
+  )
+  logger::log_info("Clean up parallel")
+  doParallel::stopImplicitCluster()
+
+  best_model <- tune::select_best(model_res, "roc_auc")
+
+  final_model <- tune_wf %>%
+    tune::finalize_workflow(best_model) %>%
+    parsnip::fit(data = training_data)
+
+  logger::log_info("Training C5.0 rules model")
+  last_fit <- final_model %>%
+    tune::last_fit(splitdata)
+
+  # This isn't used but checks for fails.
+  test_fit <- final_model %>%
+    stats::predict(new_data = test_data)
+
+  train_roc <- tune::show_best(model_res, metric = "roc_auc", n = 1)$mean
+  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == "roc_auc", ]$.estimate
+
+  logger::log_info(glue::glue("Returning decision tree model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
+                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
+  ))
+  return(final_model)
+} # likely slow preprocess ok
+
+buildQualiModel_CART <- function(model_data = combineData()) {
+  # Thin Data
+  model_data <- model_data %>%
+    dplyr::select(c(
+      # ID columns
+      "raceId", "circuitId", "driverId", "currentConstructorId",
+      # quali data (TARGET)
+      "qPosition",
+      # driver data
+      "driverAge", "driverGPExperience", "driverSeasonWins",
+      "driverSeasonWinsPerc", "driverPoints", "driverPointsPerc", "driverHomeRace",
+      # constructor data
+      "constructorPoints", "constructorSeasonWins", "constructorPointsPerc",
+      "constructorSeasonWinsPerc", "constructorHomeRace",
+      # circuit data
+      "circuitAltitude", "circuitLength", "circuitType", "circuitDirection",
+      # practice data
+      "driverPercPracticeLaps", "constructorPercPracticeLaps", "driverPracticeBestPerc", "driverPracticeAvgPerc",
+      "constructorPracticeBestPerc", "constructorPracticeAvgPerc", "driverTeamPracticeAvgGapPerc"
+    )) %>%
+    dplyr::filter(.data$qPosition > 0) %>%
+    dplyr::filter(.data$qPosition <= 20) %>%
+    dplyr::mutate("qPosition" = as.character(.data$qPosition))
+
+  # Split data
+  splitdata <- rsample::initial_split(model_data, 0.8)
+  training_data <- rsample::training(splitdata)
+  test_data <- rsample::testing(splitdata)
+
+  tune_spec <- parsnip::decision_tree(
+    tree_depth = tune::tune(),
+    min_n = tune::tune(),
+    cost_complexity = tune::tune()
+  ) %>%
+    parsnip::set_mode("classification") %>%
+    parsnip::set_engine("rpart")
+
+  init_recipe <- recipes::recipe(qPosition ~ ., training_data) %>%
+    recipes::update_role("raceId", new_role = "ID") %>%
+    recipes::update_role("circuitId", new_role = "ID") %>%
+    recipes::update_role("driverId", new_role = "ID") %>%
+    recipes::update_role("currentConstructorId", new_role = "ID") %>%
+    recipes::step_string2factor(c("circuitType", "circuitDirection")) %>%
+    recipes::step_dummy(recipes::all_nominal_predictors())
+
+  tune_wf <- workflows::workflow() %>%
+    workflows::add_recipe(init_recipe) %>%
+    workflows::add_model(tune_spec)
+
+  cv <- rsample::vfold_cv(training_data)
+
+  grid <- dials::grid_max_entropy(
+    dials::tree_depth(),
+    dials::min_n(),
+    dials::cost_complexity(),
+    size = 30
+  )
+
+  logger::log_info("Setting up parallel for tuning CART model")
+  doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
+  logger::log_info("Tuning CART model")
+  model_res <- tune::tune_grid(tune_wf,
+                               resamples = cv,
+                               grid = grid,
+                               control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
+  )
+  logger::log_info("Clean up parallel")
+  doParallel::stopImplicitCluster()
+
+  best_model <- tune::select_best(model_res, "roc_auc")
+
+  final_model <- tune_wf %>%
+    tune::finalize_workflow(best_model) %>%
+    parsnip::fit(data = training_data)
+
+  logger::log_info("Training CART model")
+  last_fit <- final_model %>%
+    tune::last_fit(splitdata)
+
+  # This isn't used but checks for fails.
+  test_fit <- final_model %>%
+    stats::predict(new_data = test_data)
+
+  train_roc <- tune::show_best(model_res, metric = "roc_auc", n = 1)$mean
+  test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == "roc_auc", ]$.estimate
+
+  logger::log_info(glue::glue("Returning CART model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
+                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
+  ))
+  return(final_model)
+} # 2 minutes, preprocess ok ~0.73
+
+buildQualiModel_mix <- function(model_data = combineData()){
+  NULL
 }
