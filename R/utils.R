@@ -100,5 +100,5 @@ updateConstructor <- Vectorize(.updateConstructor, SIMPLIFY = T, USE.NAMES = F)
 # https://stackoverflow.com/a/67497500/3933405
 unregister_dopar <- function() {
   env <- foreach:::.foreachGlobals
-  rm(list=ls(name=env), pos=env)
+  rm(list = ls(name = env), pos = env)
 }

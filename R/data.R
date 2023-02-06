@@ -419,7 +419,7 @@ assignDriverConstructor <- function(data, raceId) {
 #'
 #' @return a tibble with tons of data
 .combineData <- function(driverCrashEWMA = 0.05, carFailureEWMA = 0.05, tireFailureEWMA = 0.05,
-                        disqualifiedEWMA = .05, gridPositionCorEWMA = 0.2) {
+                         disqualifiedEWMA = .05, gridPositionCorEWMA = 0.2) {
   # This function combines the data from the saved data sets to one
   # useful data frame for modelling. It also includes reprocessing
   # steps.
@@ -768,7 +768,7 @@ assignDriverConstructor <- function(data, raceId) {
 #'
 #' @return a tibble with tons of data
 #' @export
-combineData<-memoise::memoise(.combineData)
+combineData <- memoise::memoise(.combineData)
 
 buildQualiModel_rf <- function(model_data = combineData()) {
   # Thin Data
@@ -802,7 +802,7 @@ buildQualiModel_rf <- function(model_data = combineData()) {
   tune_spec <- parsnip::rand_forest(
     mtry = tune::tune(),
     min_n = tune::tune()
-    ) %>%
+  ) %>%
     parsnip::set_mode("classification") %>%
     parsnip::set_engine("ranger")
 
@@ -892,7 +892,7 @@ buildQualiModel_glm <- function(model_data = combineData()) {
     recipes::update_role("driverId", new_role = "ID") %>%
     recipes::update_role("currentConstructorId", new_role = "ID") %>%
     recipes::step_string2factor(c("circuitType", "circuitDirection")) %>%
-    recipes::step_dummy(recipes::all_nominal_predictors()) #%>%
+    recipes::step_dummy(recipes::all_nominal_predictors()) # %>%
 
   tune_wf <- workflows::workflow() %>%
     workflows::add_recipe(init_recipe) %>%
@@ -995,7 +995,7 @@ buildQualiModel_svm <- function(model_data = combineData()) {
   )
 
   logger::log_info("Setting up parallel for svm model")
-  doParallel::registerDoParallel(cores = max(parallel::detectCores()-2,4))
+  doParallel::registerDoParallel(cores = max(parallel::detectCores() - 2, 4))
   logger::log_info("Tuning svm model")
   model_res <- tune::tune_grid(tune_wf,
     resamples = cv,
@@ -1058,8 +1058,10 @@ buildQualiModel_xgb <- function(model_data = combineData()) {
   training_data <- rsample::training(splitdata)
   test_data <- rsample::testing(splitdata)
 
-  tune_spec <- parsnip::boost_tree(trees = tune::tune(),tree_depth = tune::tune(),min_n = tune::tune(), mtry = tune::tune(),
-                                   loss_reduction = tune::tune(), sample_size = tune::tune(), learn_rate = tune::tune()) %>%
+  tune_spec <- parsnip::boost_tree(
+    trees = tune::tune(), tree_depth = tune::tune(), min_n = tune::tune(), mtry = tune::tune(),
+    loss_reduction = tune::tune(), sample_size = tune::tune(), learn_rate = tune::tune()
+  ) %>%
     parsnip::set_mode("classification") %>%
     parsnip::set_engine("xgboost", scale_pos_weight = tune::tune(), max_delta_step = 1)
 
@@ -1088,7 +1090,7 @@ buildQualiModel_xgb <- function(model_data = combineData()) {
     sample_size = dials::sample_prop(),
     dials::finalize(dials::mtry(), train_data),
     dials::learn_rate(),
-    dials::scale_pos_weight(range = c(8,10)),
+    dials::scale_pos_weight(range = c(8, 10)),
     size = 30
   )
 
@@ -1122,7 +1124,7 @@ buildQualiModel_xgb <- function(model_data = combineData()) {
   test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == "roc_auc", ]$.estimate
 
   logger::log_info(glue::glue("Returning xgb model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
-                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
+    roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
   ))
   return(final_model)
 } # SLOW
@@ -1211,7 +1213,7 @@ buildQualiModel_knn <- function(model_data = combineData()) {
   test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == "roc_auc", ]$.estimate
 
   logger::log_info(glue::glue("Returning knn model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
-                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
+    roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
   ))
   return(final_model)
 } # 20s preprocess ok. ~0.60
@@ -1245,7 +1247,7 @@ buildQualiModel_nb <- function(model_data = combineData()) {
   training_data <- rsample::training(splitdata)
   test_data <- rsample::testing(splitdata)
 
-  require('discrim')
+  require("discrim")
 
   tune_spec <- parsnip::naive_Bayes(
     smoothness = tune::tune(),
@@ -1278,9 +1280,9 @@ buildQualiModel_nb <- function(model_data = combineData()) {
   doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
   logger::log_info("Tuning nb model")
   model_res <- tune::tune_grid(tune_wf,
-                               resamples = cv,
-                               grid = grid,
-                               control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
+    resamples = cv,
+    grid = grid,
+    control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
   )
   logger::log_info("Clean up parallel")
   doParallel::stopImplicitCluster()
@@ -1303,7 +1305,7 @@ buildQualiModel_nb <- function(model_data = combineData()) {
   test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == "roc_auc", ]$.estimate
 
   logger::log_info(glue::glue("Returning naive bayes model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
-                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
+    roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
   ))
   return(final_model)
 } # 20 minutes - preprocess ok ~0.72
@@ -1370,9 +1372,9 @@ buildQualiModel_dt <- function(model_data = combineData()) {
   doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
   logger::log_info("Tuning decision tree model")
   model_res <- tune::tune_grid(tune_wf,
-                               resamples = cv,
-                               grid = grid,
-                               control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
+    resamples = cv,
+    grid = grid,
+    control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
   )
   logger::log_info("Clean up parallel")
   doParallel::stopImplicitCluster()
@@ -1395,7 +1397,7 @@ buildQualiModel_dt <- function(model_data = combineData()) {
   test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == "roc_auc", ]$.estimate
 
   logger::log_info(glue::glue("Returning decision tree model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
-                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
+    roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
   ))
   return(final_model)
 } # likely slow preprocess ok
@@ -1462,9 +1464,9 @@ buildQualiModel_CART <- function(model_data = combineData()) {
   doParallel::registerDoParallel(cores = parallel::detectCores(logical = F) - 2)
   logger::log_info("Tuning CART model")
   model_res <- tune::tune_grid(tune_wf,
-                               resamples = cv,
-                               grid = grid,
-                               control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
+    resamples = cv,
+    grid = grid,
+    control = tune::control_grid(save_pred = TRUE, verbose = TRUE)
   )
   logger::log_info("Clean up parallel")
   doParallel::stopImplicitCluster()
@@ -1487,11 +1489,11 @@ buildQualiModel_CART <- function(model_data = combineData()) {
   test_roc <- tune::collect_metrics(last_fit)[tune::collect_metrics(last_fit)$.metric == "roc_auc", ]$.estimate
 
   logger::log_info(glue::glue("Returning CART model with roc_auc training value of {roc_train} and test roc_auc of {roc_test}.",
-                              roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
+    roc_train = round(train_roc, 4), roc_test = round(test_roc, 4)
   ))
   return(final_model)
 } # 2 minutes, preprocess ok ~0.73
 
-buildQualiModel_mix <- function(model_data = combineData()){
+buildQualiModel_mix <- function(model_data = combineData()) {
   NULL
 }
