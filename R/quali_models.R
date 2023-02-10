@@ -815,7 +815,7 @@ buildQualiModel_mix <- function(model_data = combineData()) {
   # ----- KNN -----
   knn_spec <- parsnip::nearest_neighbor(
     neighbors = tune::tune()
-    ) %>%
+  ) %>%
     parsnip::set_mode("classification") %>%
     parsnip::set_engine("kknn")
 
@@ -868,7 +868,7 @@ buildQualiModel_mix <- function(model_data = combineData()) {
     stacks::stacks() %>%
     # add candidate members
     stacks::add_candidates(decision_tree_res) %>%
-    #stacks::add_candidates(naive_bayes_res) %>%
+    # stacks::add_candidates(naive_bayes_res) %>%
     stacks::add_candidates(knn_res) %>%
     stacks::add_candidates(glm_res) %>%
     # determine how to combine their predictions
