@@ -477,7 +477,7 @@ buildQualiModel_nb <- function(model_data = combineData()) {
   training_data <- rsample::training(splitdata)
   test_data <- rsample::testing(splitdata)
 
-  require("discrim")
+  requireNamespace("discrim")
 
   tune_spec <- parsnip::naive_Bayes(
     smoothness = tune::tune(),
@@ -569,7 +569,7 @@ buildQualiModel_dt <- function(model_data = combineData()) {
   training_data <- rsample::training(splitdata)
   test_data <- rsample::testing(splitdata)
 
-  require(rules)
+  requireNamespace(rules)
 
   tune_spec <- parsnip::decision_tree(
     cost_complexity = tune::tune(),
@@ -791,6 +791,8 @@ buildQualiModel_mix <- function(model_data = combineData()) {
     )
 
   # ----- Naive Bayes -----
+  # requireNamespace("discrim")
+  #
   # naive_bayes_spec <- parsnip::naive_Bayes(
   #   smoothness = tune::tune(),
   #   Laplace = tune::tune()
@@ -811,6 +813,30 @@ buildQualiModel_mix <- function(model_data = combineData()) {
   #   )
 
   # ----- SVM Linear - s2f, dummy, norm, nzv-----
+  svm_spec <- parsnip::svm_linear(
+    penalty = tune::tune(),
+    mixture = tune::tune()
+  ) %>%
+    parsnip::set_mode("classification") %>%
+    parsnip::set_engine("kernlab")
+
+  svm_rec <-
+    model_recipe %>%
+    recipes::step_dummy(recipes::all_nominal_predictors()) %>%
+    recipes::step_nzv(recipes::all_predictors()) %>%
+    recipes::step_normalize(recipes::all_predictors())
+
+  svm_workflow <-
+    model_workflow %>%
+    workflows::add_model(svm_spec) %>%
+    workflows::update_recipe(svm_rec)
+
+  svm_res <- tune::tune_grid(
+    object = svm_workflow,
+    resamples = folds,
+    grid = 10,
+    control = ctrl_grid
+  )
 
   # ----- KNN -----
   knn_spec <- parsnip::nearest_neighbor(
@@ -860,7 +886,6 @@ buildQualiModel_mix <- function(model_data = combineData()) {
     grid = 10,
     control = ctrl_grid
   )
-  # ----- CART - s2f, dummy, nzv  -----
 
   # ----- STACK IT -----
   model_stack <-
@@ -871,6 +896,7 @@ buildQualiModel_mix <- function(model_data = combineData()) {
     # stacks::add_candidates(naive_bayes_res) %>%
     stacks::add_candidates(knn_res) %>%
     stacks::add_candidates(glm_res) %>%
+    stacks::add_candidates(svm_res) %>%
     # determine how to combine their predictions
     stacks::blend_predictions() %>%
     # fit the candidates with nonzero stacking coefficients
