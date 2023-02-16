@@ -6,7 +6,7 @@ buildRaceModel_mix <- function(model_data = combineData()) {
       "raceId", "circuitId", "driverId", "currentConstructorId",
       # Race Finish (TARGET) (note: if reused for MC )
       "position",
-      #Race Info
+      # Race Info
       "weather", "grid",
       # quali data
       "qPosition", "qGapPerc",
