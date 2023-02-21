@@ -526,25 +526,29 @@ assignDriverConstructor <- function(data, raceId) {
   # -------- Pitstops ---------------------------------
   logger::log_info("Manipulating Pit Stop data")
   pits <- f1model::pit_stops %>%
-    dplyr::mutate('duration' = .data$milliseconds / 1000) %>%
+    dplyr::mutate("duration" = .data$milliseconds / 1000) %>%
     dplyr::select(c("raceId", "driverId", "stop", "lap", "duration")) %>%
     dplyr::group_by(.data$raceId) %>%
-    dplyr::mutate('raceAvgPitDuration' = mean(.data$duration, na.rm = T)) %>%
+    dplyr::mutate("raceAvgPitDuration" = mean(.data$duration, na.rm = T)) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$driverId) %>%
-    dplyr::mutate('driverNumPits' = dplyr::n(),
-                  'driverAvgPitDuration' = mean(.data$duration, na.rm = T),
-                  'driverAvgPitDurationPerc' = .data$driverAvgPitDuration/.data$raceAvgPitDuration,
-                  'driverTotalPitNum' = max(.data$stop)) %>%
+    dplyr::mutate(
+      "driverNumPits" = dplyr::n(),
+      "driverAvgPitDuration" = mean(.data$duration, na.rm = T),
+      "driverAvgPitDurationPerc" = .data$driverAvgPitDuration / .data$raceAvgPitDuration,
+      "driverTotalPitNum" = max(.data$stop)
+    ) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId) %>%
-    dplyr::mutate('raceAvgNumPits' = mean(.data$driverTotalPitNum, na.rm=T)) %>%
+    dplyr::mutate("raceAvgNumPits" = mean(.data$driverTotalPitNum, na.rm = T)) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId) %>%
-    dplyr::mutate('driverNumPitPerc' = .data$driverNumPits/.data$raceAvgNumPits) %>%
+    dplyr::mutate("driverNumPitPerc" = .data$driverNumPits / .data$raceAvgNumPits) %>%
     dplyr::ungroup() %>%
-    dplyr::select(c("raceId", "driverId", "driverNumPits","driverAvgPitDurationPerc", "raceAvgPitDuration",
-                    'raceAvgNumPits', "driverNumPitPerc")) %>%
+    dplyr::select(c(
+      "raceId", "driverId", "driverNumPits", "driverAvgPitDurationPerc", "raceAvgPitDuration",
+      "raceAvgNumPits", "driverNumPitPerc"
+    )) %>%
     dplyr::distinct()
 
 
@@ -667,24 +671,24 @@ assignDriverConstructor <- function(data, raceId) {
 
   # -------- Lap Times --------------------------------
   logger::log_info("Manipulating Lap Times Data")
-  laptimes<-f1model::lap_times %>%
-    #calculate estimated fuel adjusted times
+  laptimes <- f1model::lap_times %>%
+    # calculate estimated fuel adjusted times
     dplyr::group_by(.data$raceId) %>%
-    dplyr::mutate('numLaps' = max(.data$lap)) %>%
+    dplyr::mutate("numLaps" = max(.data$lap)) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$driverId) %>%
-    dplyr::mutate('time_adj' = 25*(100/.data$numLaps)*(.data$numLaps-.data$lap)) %>%
-    dplyr::mutate('fuelAdjTime' = .data$milliseconds - .data$time_adj) %>%
-    #filter out slow laps (likely lap 1/safety car/in&out laps, etc)
-    dplyr::filter(.data$fuelAdjTime < min(.data$fuelAdjTime, na.rm=T)*1.20) %>%
+    dplyr::mutate("time_adj" = 25 * (100 / .data$numLaps) * (.data$numLaps - .data$lap)) %>%
+    dplyr::mutate("fuelAdjTime" = .data$milliseconds - .data$time_adj) %>%
+    # filter out slow laps (likely lap 1/safety car/in&out laps, etc)
+    dplyr::filter(.data$fuelAdjTime < min(.data$fuelAdjTime, na.rm = T) * 1.20) %>%
     dplyr::filter(.data$lap != 1) %>%
-    #calculate SD & RSD with rolling 5 lap windows.
-    dplyr::mutate('lap_sd_roll' = zoo::rollapplyr(.data$fuelAdjTime, 5, sd, na.rm = T, fill = NA)) %>%
-    dplyr::filter(.data$lap_sd_roll < mean(.data$lap_sd_roll, na.rm=T) + 2*sd(.data$lap_sd_roll, na.rm=T)) %>%
-    dplyr::mutate('driver_laptime_sd' = mean(.data$lap_sd_roll, na.rm=T)) %>%
-    dplyr::mutate('driver_laptime_rsd' = .data$driver_laptime_sd/mean(.data$fuelAdjTime, na.rm = T)) %>%
+    # calculate SD & RSD with rolling 5 lap windows.
+    dplyr::mutate("lap_sd_roll" = zoo::rollapplyr(.data$fuelAdjTime, 5, sd, na.rm = T, fill = NA)) %>%
+    dplyr::filter(.data$lap_sd_roll < mean(.data$lap_sd_roll, na.rm = T) + 2 * sd(.data$lap_sd_roll, na.rm = T)) %>%
+    dplyr::mutate("driver_laptime_sd" = mean(.data$lap_sd_roll, na.rm = T)) %>%
+    dplyr::mutate("driver_laptime_rsd" = .data$driver_laptime_sd / mean(.data$fuelAdjTime, na.rm = T)) %>%
     dplyr::ungroup() %>%
-    dplyr::select(c('raceId', 'driverId', 'driver_laptime_rsd')) %>%
+    dplyr::select(c("raceId", "driverId", "driver_laptime_rsd")) %>%
     dplyr::distinct()
 
   # -------- Merges -----------------------------------
@@ -718,20 +722,26 @@ assignDriverConstructor <- function(data, raceId) {
     # ---- Add Pit Stop Info ----
     dplyr::left_join(pits, by = c("raceId", "driverId")) %>%
     dplyr::group_by(.data$circuitId) %>%
-    dplyr::mutate('circuitAvgPitDuration' = mean(.data$raceAvgPitDuration, na.rm = T),
-                  'circuitAvgNumPits' = mean(.data$raceAvgNumPits, na.rm=T)) %>%
+    dplyr::mutate(
+      "circuitAvgPitDuration" = mean(.data$raceAvgPitDuration, na.rm = T),
+      "circuitAvgNumPits" = mean(.data$raceAvgNumPits, na.rm = T)
+    ) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$driverId) %>%
-    dplyr::mutate('driverAvgPitPerc' = ewma_drop(.data$driverAvgPitDurationPerc, pitPercEWMA),
-                  'driverAvgNumPitPerc' = ewma_drop(.data$driverNumPitPerc, pitPercEWMA)) %>%
-    dplyr::mutate('driverAvgPitPerc' = tidyr::replace_na(.data$driverAvgPitPerc, 1),
-                  'driverAvgNumPitPerc' = tidyr::replace_na(.data$driverAvgNumPitPerc, 1)) %>%
+    dplyr::mutate(
+      "driverAvgPitPerc" = ewma_drop(.data$driverAvgPitDurationPerc, pitPercEWMA),
+      "driverAvgNumPitPerc" = ewma_drop(.data$driverNumPitPerc, pitPercEWMA)
+    ) %>%
+    dplyr::mutate(
+      "driverAvgPitPerc" = tidyr::replace_na(.data$driverAvgPitPerc, 1),
+      "driverAvgNumPitPerc" = tidyr::replace_na(.data$driverAvgNumPitPerc, 1)
+    ) %>%
     dplyr::ungroup() %>%
     # ---- Add laptime info ----
-    dplyr::left_join(laptimes, by = c('raceId', 'driverId')) %>%
+    dplyr::left_join(laptimes, by = c("raceId", "driverId")) %>%
     dplyr::group_by(.data$driverId) %>%
-    dplyr::mutate('driverAvgLaptimeRSD' = ewma_drop(.data$driver_laptime_rsd, pitPercEWMA)) %>%
-    dplyr::ungroup () %>%
+    dplyr::mutate("driverAvgLaptimeRSD" = ewma_drop(.data$driver_laptime_rsd, pitPercEWMA)) %>%
+    dplyr::ungroup() %>%
     # ---- Add Driver & constructor Points Going In. ----
     # lastRaceId = raceId to lag the points to the poitns incoming to a race.
     dplyr::left_join(driver_standings, by = c("lastRaceId" = "raceId", "driverId" = "driverId")) %>%
