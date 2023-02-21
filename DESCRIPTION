@@ -30,7 +30,8 @@ Imports:
     dials,
     foreach,
     stacks,
-    yardstick
+    yardstick,
+    zoo
 Remotes:
     SCasanova/f1dataR
 Suggests: 
