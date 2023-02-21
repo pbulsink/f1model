@@ -192,3 +192,17 @@
 #'
 #' @source https://ergast.com/api/f1/qualifying
 "qualifying"
+
+#' Lap Times
+#'
+#' @description a data frame of all lap times from Ergast
+#'
+#' @format a data frame with the following columns:
+#' - raceId (see `races`, integer)
+#' - driverId (see `drivers`, integer)
+#' - lap (lap number, integer)
+#' - position (driver position at that lap, integer)
+#' - time (time of lap, in mm:ss.mmm form, character)
+#' - milliseconds (time of lap in milliseconds, integer)
+#'
+#' @source https://ergast.com/api/f1/laps
