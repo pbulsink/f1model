@@ -764,9 +764,9 @@ assignDriverConstructor <- function(data, raceId) {
       "constructorPointsPerc" = tidyr::replace_na(.data$constructorPointsPerc, 0),
       "driverSeasonWinsPerc" = tidyr::replace_na(.data$driverSeasonWinsPerc, 0),
       "constructorSeasonWinsPerc" = tidyr::replace_na(.data$constructorSeasonWinsPerc, 0),
-      "circuitAvgPitDuration" = tidyr::replace_na(.data$circuitAvgPitDuration, mean(.data$circuitAvgPitDuration, na.rm=T)),
+      "circuitAvgPitDuration" = tidyr::replace_na(.data$circuitAvgPitDuration, mean(.data$circuitAvgPitDuration, na.rm = T)),
       "circuitAvgNumPits" = tidyr::replace_na(.data$circuitAvgNumPits, mean(.data$circuitAvgNumPits, na.rm = T)),
-      "driverAvgLaptimeRSD" = tidyr::replace_na(.data$driverAvgLaptimeRSD, mean(.data$driverAvgLaptimeRSD, na.rm=T))
+      "driverAvgLaptimeRSD" = tidyr::replace_na(.data$driverAvgLaptimeRSD, mean(.data$driverAvgLaptimeRSD, na.rm = T))
     ) %>%
     dplyr::ungroup()
 
@@ -817,7 +817,7 @@ assignDriverConstructor <- function(data, raceId) {
       "circuitNationality", "avgGridPosCor",
       # pit data
       "driverAvgPitPerc", "driverAvgNumPitPerc", "circuitAvgPitDuration", "circuitAvgNumPits",
-      #laps data
+      # laps data
       "driverAvgLaptimeRSD",
       # quali data
       "qPosition", "qGapPerc",

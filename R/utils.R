@@ -31,7 +31,7 @@ timeToSec <- Vectorize(.timeToSec, SIMPLIFY = T, USE.NAMES = F)
 
 ewma <- function(x, a) {
   x <- as.numeric(x)
-  if(all(is.na(x))){
+  if (all(is.na(x))) {
     return(rep(NA, length(x)))
   }
   if (min(which(!is.na(x))) != 1) {
@@ -115,12 +115,12 @@ unregister_dopar <- function() {
 #' Mean_Less Than
 #'
 #' @description returns mean value for all values less than the lt value - i.e. filter out data above a threshold
-mean_lt <- function(x, lt, na.rm=T, ...){
-  x <- x[x<lt]
-  if(length(x) == 0){
+mean_lt <- function(x, lt, na.rm = T, ...) {
+  x <- x[x < lt]
+  if (length(x) == 0) {
     return(NA)
   } else {
-    return(mean(x, na.rm=na.rm, ...))
+    return(mean(x, na.rm = na.rm, ...))
   }
 }
 
@@ -129,14 +129,14 @@ mean_lt <- function(x, lt, na.rm=T, ...){
 #' @description from the `fGarch` package `fGarch::rsnorm`
 #'
 rsn <- function(mean, sd, xi = 5, n = 1) {
-  weight <- xi/(xi + 1/xi)
-  z <-  stats::runif(n, -weight, 1 - weight)
+  weight <- xi / (xi + 1 / xi)
+  z <- stats::runif(n, -weight, 1 - weight)
   Xi <- xi^sign(z)
-  sn <- -abs(stats::rnorm(n))/Xi * sign(z)
-  m1 <- 2/sqrt(2 * pi)
-  mu <- m1 * (xi - 1/xi)
-  sigma <- sqrt((1 - m1^2) * (xi^2 + 1/xi^2) + 2 * m1^2 - 1)
-  sn <- (sn - mu)/sigma
+  sn <- -abs(stats::rnorm(n)) / Xi * sign(z)
+  m1 <- 2 / sqrt(2 * pi)
+  mu <- m1 * (xi - 1 / xi)
+  sigma <- sqrt((1 - m1^2) * (xi^2 + 1 / xi^2) + 2 * m1^2 - 1)
+  sn <- (sn - mu) / sigma
   sn <- sn * sd + mean
   return(sn)
 }
