@@ -529,12 +529,12 @@ assignDriverConstructor <- function(data, raceId) {
     dplyr::mutate("duration" = .data$milliseconds / 1000) %>%
     dplyr::select(c("raceId", "driverId", "stop", "lap", "duration")) %>%
     dplyr::group_by(.data$raceId) %>%
-    dplyr::mutate("raceAvgPitDuration" = mean(.data$duration, na.rm = T)) %>%
+    dplyr::mutate("raceAvgPitDuration" = mean_lt(.data$duration, 180, na.rm = T)) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$raceId, .data$driverId) %>%
     dplyr::mutate(
       "driverNumPits" = dplyr::n(),
-      "driverAvgPitDuration" = mean(.data$duration, na.rm = T),
+      "driverAvgPitDuration" = mean_lt(.data$duration, 240, na.rm = T),
       "driverAvgPitDurationPerc" = .data$driverAvgPitDuration / .data$raceAvgPitDuration,
       "driverTotalPitNum" = max(.data$stop)
     ) %>%
@@ -723,7 +723,7 @@ assignDriverConstructor <- function(data, raceId) {
     dplyr::left_join(pits, by = c("raceId", "driverId")) %>%
     dplyr::group_by(.data$circuitId) %>%
     dplyr::mutate(
-      "circuitAvgPitDuration" = mean(.data$raceAvgPitDuration, na.rm = T),
+      "circuitAvgPitDuration" = mean_lt(.data$raceAvgPitDuration, 180, na.rm = T),
       "circuitAvgNumPits" = mean(.data$raceAvgNumPits, na.rm = T)
     ) %>%
     dplyr::ungroup() %>%
@@ -733,8 +733,8 @@ assignDriverConstructor <- function(data, raceId) {
       "driverAvgNumPitPerc" = ewma_drop(.data$driverNumPitPerc, pitPercEWMA)
     ) %>%
     dplyr::mutate(
-      "driverAvgPitPerc" = tidyr::replace_na(.data$driverAvgPitPerc, 1),
-      "driverAvgNumPitPerc" = tidyr::replace_na(.data$driverAvgNumPitPerc, 1)
+      "driverAvgPitPerc" = tidyr::replace_na(.data$driverAvgPitPerc, 1L),
+      "driverAvgNumPitPerc" = tidyr::replace_na(.data$driverAvgNumPitPerc, 1L)
     ) %>%
     dplyr::ungroup() %>%
     # ---- Add laptime info ----
@@ -763,7 +763,10 @@ assignDriverConstructor <- function(data, raceId) {
       "driverPointsPerc" = tidyr::replace_na(.data$driverPointsPerc, 0),
       "constructorPointsPerc" = tidyr::replace_na(.data$constructorPointsPerc, 0),
       "driverSeasonWinsPerc" = tidyr::replace_na(.data$driverSeasonWinsPerc, 0),
-      "constructorSeasonWinsPerc" = tidyr::replace_na(.data$constructorSeasonWinsPerc, 0)
+      "constructorSeasonWinsPerc" = tidyr::replace_na(.data$constructorSeasonWinsPerc, 0),
+      "circuitAvgPitDuration" = tidyr::replace_na(.data$circuitAvgPitDuration, mean(.data$circuitAvgPitDuration, na.rm=T)),
+      "circuitAvgNumPits" = tidyr::replace_na(.data$circuitAvgNumPits, mean(.data$circuitAvgNumPits, na.rm = T)),
+      "driverAvgLaptimeRSD" = tidyr::replace_na(.data$driverAvgLaptimeRSD, mean(.data$driverAvgLaptimeRSD, na.rm=T))
     ) %>%
     dplyr::ungroup()
 
@@ -814,6 +817,8 @@ assignDriverConstructor <- function(data, raceId) {
       "circuitNationality", "avgGridPosCor",
       # pit data
       "driverAvgPitPerc", "driverAvgNumPitPerc", "circuitAvgPitDuration", "circuitAvgNumPits",
+      #laps data
+      "driverAvgLaptimeRSD",
       # quali data
       "qPosition", "qGapPerc",
       # practice data

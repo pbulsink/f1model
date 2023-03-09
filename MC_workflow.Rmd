@@ -1,0 +1,152 @@
+---
+title: "Exploration towared Race MC"
+author: "Phil Bulsink"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(f1model)
+set.seed(123)
+```
+
+# Introduction
+
+While one can probabilistically model race finishing position (based on a host of input data values) the intrigue of watching a F1 race is on the random unpredictable events and how the racers and teams adapt. Should one be interested in predicting the effect of those events, a Monte Carlo (MC) simulation would be much more adept to predict the outcome of races.
+
+# Already Done Work
+
+Using the Ergast Data and some data from FastF1 python library, as well as other sources, the dataset already has been prepared with some derivative data. In particular, data about circuit (altitude, weather, historical correlation between starting and finishing positions), constructor (car failure rate, tire failure rate), driver (crash rate, disqualification rate, laptime repeatability), pit stops (avg \# pits per circuit, avg pit duration, driver/constructor avg pit speed & avg num vs field), practice information (driver & constructor number of laps, pace, relative to teammate), qualifying (position, gap to leader), etc. have been determined.
+
+# Literature
+
+The following literature sources have been used in this data exploration.
+
+-   Heilmeier et. al. 2020 <https://www.mdpi.com/2076-3417/10/12/4229>
+-   Heilmeier et. al. 2018 <https://ieeexplore.ieee.org/abstract/document/8570012>
+
+# Notes from Literature
+
+-   Heilmeier et. al. 2020:
+    -   Not all events are truly lap-based. There are some like Safety Car that might occur when the lead driver is on lap 45 but other cars are still on lap 44 or 43. These should be modeled by a race time (e.g. t~race~ = 3600s) to accurately bring cars together in time correctly.
+    -   lap time under safety car = 1.60x
+    -   lap time under VSC = 1.40x
+    -   Use a 'ghost' safety car - at t~sc~ put the safety car out to start a lap. All other drivers drive at VSC rate until they catch safety car and then go SC rate.
+        -   Determine this by t~sc~, and determine the % of lap of every car. Calculate the time to catch up to the SC.
+    -   add time to s/f line by grid position to l1
+    -   determine lap 1 position gain/loss per driver (avg)
+    -   \~30% of safety cars are lap 1 - use that with circuit avg.
+-   Heilmeier et. al. 2018:
+    -   DRS Effect can be modeled after lap 2 and 2 laps after SC.
+
+        -   if car within 1 second, give a benefit.
+
+    -   Overtaking can slow both cars, but the overtaken car more than the overtaking.
+
+    -   Model each driver's performance vs. a theoretical (stable) lap time instead of
+
+# Building the Lap Simulator
+
+Let's build a lap simulator! To start, we need some basic parameters.
+
+```{r basic parameters}
+parameters <- list(
+  avg_lap_time = 94, #like COTA in Phoenix
+  num_laps = 56,
+  num_drivers = 20
+)
+```
+
+If laps are modeled by deviation from a average lap (in our scenario, `r parameters$avg_lap_time` seconds long), a race can be simulated by:
+
+```{r model lap}
+simulate_lap_time<-function(params = parameters){
+  lap_time = 0
+}
+
+simulate_race<-function(params = parameters){
+  driver_times = data.frame(driver = 1:params$num_drivers,
+                            position = 1:params$num_drivers,
+                            race_time = NA_real_)
+  for (lap in 1:params$num_laps){
+    for (driver in unique(driver_times$driver)){
+      driver_times[driver_times$driver == driver, ]$race_time <- 
+        sum(driver_times[driver_times$driver == driver, ]$race_time, simulate_lap_time(params = params), params$avg_lap_time, na.rm=TRUE)
+    }
+  }
+  
+  return(driver_times)
+}
+
+simulate_race(parameters)
+```
+
+Note that here we just have driver numbers = starting grid position. Of course, since each driver is getting only the average lap time, each driver is finishing with the same time as everyone else. But we can start to add complexity to this piece by piece, rerunning the simulations each time.
+
+One quick item to add is the grid start position to the start line time (i.e. from the grid box to the start line). This is longer for cars near the back than it is near the front of the grid, and was modeled by Heilmer et. al., 2020 as being `ts = sqrt((2*(grid*8-0.8))/11.2)+0.2.`
+
+```{r delay_for_grid_start_position}
+simulate_lap_time<-function(lap, grid, params = parameters){
+  if(lap == 1){
+    ts = sqrt((2*(grid*8-0.8))/11.2)+0.2
+  } else {
+    ts = 0
+  }
+  lap_time = 0 + ts
+}
+
+simulate_race<-function(params = parameters){
+  driver_times = data.frame(driver = 1:params$num_drivers,
+                            position = 1:params$num_drivers,
+                            grid = 1:params$num_drivers,
+                            race_time = NA_real_)
+  for (lap in 1:params$num_laps){
+    for (driver in unique(driver_times$driver)){
+      driver_times[driver_times$driver == driver, ]$race_time <- 
+        sum(driver_times[driver_times$driver == driver, ]$race_time, 
+            simulate_lap_time(params = params, lap=lap, grid=driver_times[driver_times$driver == driver,]$grid), 
+            params$avg_lap_time, na.rm=TRUE)
+    }
+  }
+  
+  driver_times <- driver_times %>% 
+    dplyr::arrange(.data$race_time) %>% 
+    dplyr::mutate("position" = 1:dplyr::n(),
+                  "laps" = params$num_laps - floor((.data$race_time - head(.data$race_time, 1))/params$avg_lap_time)) %>%
+    dplyr::select(c("driver", "position", "race_time", 'laps'))
+  
+  return(driver_times)
+}
+
+simulate_race(parameters)
+```
+
+We can continually iterate to add more capabilities to this model. Building piece by piece allows us to validate the performance of each item. We can add more and more parameters and add capabilities like tire deg, fuel consumption, pit stops, etc.
+
+# Turning This into Monte Carlo Simulation
+
+Of course, if we run the above code as many times as we like, our results will always be the same. But, by adding in random variation (such as small +/- to lap time based on driver skill, likelihood of pitting at any lap, likelihood of crash/retirement/safety car/etc. we can get variation in our results time with each run.
+
+```{r}
+simulate_lap_time<-function(lap, grid, params = parameters){
+  if(lap == 1){
+    ts = sqrt((2*(grid*8-0.8))/11.2)+0.2
+  } else {
+    ts = 0
+  }
+  # ToDo: model this variation, this is just a quick example!
+  tv <- runif(1, min = -1.5, max = 3+grid*.1) 
+  lap_time = 0 + ts + tv
+}
+
+simulate_race(parameters)
+simulate_race(parameters)
+```
+
+See how those two results are different? And that some cars have passed each other? The driver who started 8th won the first race! And, in the second, the last place car was not on the final lap - they'd been passed (by the first two finishers).
+
+# Generating Race Predictions
+
+At this point, repeating the process 10, 100, 1000 or more times can give us estimates of what *could* happen in the race - maybe it's most likely that Hamilton, Leclerc or Verstappen win in COTA, but what if everything goes wrong for everyone and Vettel picks up the win in an Aston Martin? Repeating the race time after time points toward if that is even a reasonable possibility.
+
+Of course, we can't model all of the variability of F1 - what were the odds of Bottas steaming up the side of the leaders in the rain taking them out, and the track dries out for the restart only to have everyone but Hamilton put on fresh tires, and Ocon takes the win? We'll never know the odds, but it happened in 2021. We can't capture everything, but hopefully we can make pretty good guesses.

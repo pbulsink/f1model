@@ -31,7 +31,8 @@ Imports:
     foreach,
     stacks,
     yardstick,
-    zoo
+    zoo,
+    sn
 Remotes:
     SCasanova/f1dataR
 Suggests: 

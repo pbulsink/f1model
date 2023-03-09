@@ -18,4 +18,12 @@ test_that("ewma calculates moving average",{
                c(1,1.5, 1.5, 2.25, 3.125, 4.0625))
   expect_equal(ewma(c(NA, NA, 1,2,3,4,5), 0.5),
                c(NA, NA, 1, 1.5, 2.25, 3.125, 4.0625))
+  expect_equal(ewma_drop(c(1,2,NA,3,4,5), 0.5),
+               c(NA, 1,1.5, 1.5, 2.25, 3.125))
+  expect_equal(ewma(c(NA, NA, NA, NA, NA), 0.5),
+               c(NA, NA, NA, NA, NA))
+})
+
+test_that("mean_lt works ok", {
+  expect_equal(mean_lt(c(1,1,1,10), 5), 1)
 })

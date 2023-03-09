@@ -31,6 +31,9 @@ timeToSec <- Vectorize(.timeToSec, SIMPLIFY = T, USE.NAMES = F)
 
 ewma <- function(x, a) {
   x <- as.numeric(x)
+  if(all(is.na(x))){
+    return(rep(NA, length(x)))
+  }
   if (min(which(!is.na(x))) != 1) {
     # handle if a vector starts with NA values
     nastart <- min(which(!is.na(x)))
@@ -49,6 +52,12 @@ ewma <- function(x, a) {
   return(s)
 }
 
+#' Exponentially weighted Moving Average (drop one)
+#'
+#' @description provides a EWMA lagged up by one position. For example: to get the EWMA of number of pit stops in all races leading up to the current.
+#' Note that `ewma` returns include the current result of the vector calculated upon, whereas this provides a quick shortcut to drop the last result.
+#'
+#' @internal
 ewma_drop <- function(x, a) {
   if (length(x) > 1) {
     e <- ewma(x[-length(x)], a)
@@ -101,4 +110,33 @@ updateConstructor <- Vectorize(.updateConstructor, SIMPLIFY = T, USE.NAMES = F)
 unregister_dopar <- function() {
   env <- foreach:::.foreachGlobals
   rm(list = ls(name = env), pos = env)
+}
+
+#' Mean_Less Than
+#'
+#' @description returns mean value for all values less than the lt value - i.e. filter out data above a threshold
+mean_lt <- function(x, lt, na.rm=T, ...){
+  x <- x[x<lt]
+  if(length(x) == 0){
+    return(NA)
+  } else {
+    return(mean(x, na.rm=na.rm, ...))
+  }
+}
+
+#' Random Number in Skew-Normal Distribution
+#'
+#' @description from the `fGarch` package `fGarch::rsnorm`
+#'
+rsn <- function(mean, sd, xi = 5, n = 1) {
+  weight <- xi/(xi + 1/xi)
+  z <-  stats::runif(n, -weight, 1 - weight)
+  Xi <- xi^sign(z)
+  sn <- -abs(stats::rnorm(n))/Xi * sign(z)
+  m1 <- 2/sqrt(2 * pi)
+  mu <- m1 * (xi - 1/xi)
+  sigma <- sqrt((1 - m1^2) * (xi^2 + 1/xi^2) + 2 * m1^2 - 1)
+  sn <- (sn - mu)/sigma
+  sn <- sn * sd + mean
+  return(sn)
 }
