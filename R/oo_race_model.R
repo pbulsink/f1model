@@ -184,7 +184,7 @@ Car <- R6::R6Class("Car",
   public = list(
     initialize = function(constructor, fuel = 100) {
       private$constructor <- match.arg(constructor, f1model::constructors$name)
-      constr<-f1model::constructors[f1model::constructors$name == private$constructor, ]
+      constr <- f1model::constructors[f1model::constructors$name == private$constructor, ]
       cat("New <Car> built by ", private$constructor, "\n")
       private$constructorId <- constr$constructorId
       stopifnot(fuel <= 100, fuel > 0)
@@ -219,7 +219,7 @@ Car <- R6::R6Class("Car",
 
 Race <- R6::R6Class("Race",
   public = list(
-    initialize = function(name, circuit, year, t_quali=90, num_laps=70) {
+    initialize = function(name, circuit, year, t_quali = 90, num_laps = 70) {
       private$name <- name
       private$circuit <- Circuit$new(circuit)
       stopifnot(as.integer(year) == year)
