@@ -1,8 +1,6 @@
 #' Object Oriented Race Model
 #'
 #' Objects to add:
-#' - Track (hold VSC/SC status, DRS specs, etc)
-#' - Status (i.e. VSC/SC)
 
 Tire <- R6::R6Class("Tire",
   public = list(
@@ -59,14 +57,16 @@ Tire <- R6::R6Class("Tire",
 Driver <- R6::R6Class("Driver",
   public = list(
     initialize = function(code, grid, constructor, tire_list = "ssmmhhiiww", t_driver = 0.5) {
-      private$code <- match_args(code, f1model::drivers$code)
+      private$code <- match.arg(code, f1model::drivers$code)
       drvr <- f1model::drivers[f1model::drivers$code == code, ]
       private$name <- paste(drvr$forename, drvr$surname)
+      cat("New <Driver> named ", private$name, "\n")
       private$dob <- drvr$dob
       private$nationality <- drvr$nationality
       private$number <- drvr$number
-      private$constructor <- match.args(constructor, f1model::constructors$name)
-      private$car <- Car$new(constructor)
+      private$constructor <- match.arg(constructor, f1model::constructors$name)
+      private$car <- Car$new(private$constructor)
+      private$driverId <- drvr$driverId
       stopifnot(as.integer(grid) == grid)
       stopifnot(grid <= 24, grid > 0)
       private$grid <- grid
@@ -168,6 +168,7 @@ Driver <- R6::R6Class("Driver",
     constructor = "",
     car = NA,
     t_driver = 0,
+    driverId = 0,
     tire_params = tibble::tibble(
       compound = c("soft", "medium", "hard", "intermediate", "wet"),
       k1 = c(10, 5, 1, 1, 1),
@@ -182,7 +183,10 @@ Driver <- R6::R6Class("Driver",
 Car <- R6::R6Class("Car",
   public = list(
     initialize = function(constructor, fuel = 100) {
-      private$constructor <- match_args(constructor, f1model::constructors$name)
+      private$constructor <- match.arg(constructor, f1model::constructors$name)
+      constr<-f1model::constructors[f1model::constructors$name == private$constructor, ]
+      cat("New <Car> built by ", private$constructor, "\n")
+      private$constructorId <- constr$constructorId
       stopifnot(fuel <= 100, fuel > 0)
       private$start_fuel <- fuel
       private$fuel <- fuel
@@ -208,14 +212,16 @@ Car <- R6::R6Class("Car",
   private = list(
     constructor = "",
     fuel = 100,
-    start_fuel = 100
+    start_fuel = 100,
+    constructorId = 0
   )
 )
 
 Race <- R6::R6Class("Race",
   public = list(
-    initialize = function(name, year, t_quali, num_laps) {
+    initialize = function(name, circuit, year, t_quali=90, num_laps=70) {
       private$name <- name
+      private$circuit <- Circuit$new(circuit)
       stopifnot(as.integer(year) == year)
       stopifnot(year > 1950, year <= as.integer(strftime(Sys.Date(), "%Y")) + 1)
       private$year <- year
@@ -231,12 +237,14 @@ Race <- R6::R6Class("Race",
     print = function(...) {
       cat("<Race>\n Name: ", private$name,
         "\n Year: ", private$year,
-        "\n Number of Drivers: ", self$get_num_drivers,
+        "\n Number of Drivers: ", self$get_num_drivers(),
+        "\n Laps Completed: ", private$current_lap,
+        "\n Current Status: ", self$get_status_type(),
         sep = ""
       )
     },
     add_driver = function(driver) {
-      stopifnot(class(driver)[1] == "Driver")
+      stopifnot("Driver" %in% class(driver))
       private$drivers <- c(private$drivers, driver)
       invisible(self)
     },
@@ -251,7 +259,9 @@ Race <- R6::R6Class("Race",
         "grid" = integer(),
         "constructor" = character(),
         "dob" = character(),
-        "nationality" = character()
+        "nationality" = character(),
+        "current_tire" = character(),
+        "tire_age" = character()
       )
       for (driver in private$drivers) {
         d <- tibble::tibble(
@@ -261,7 +271,9 @@ Race <- R6::R6Class("Race",
           "grid" = driver$get_grid(),
           "constructor" = driver$get_constructor(),
           "dob" = driver$get_dob(),
-          "nationality" = driver$get_nationality()
+          "nationality" = driver$get_nationality(),
+          "current_tire" = driver$get_current_tire_compound(),
+          "tire_age" = driver$get_current_tire_age()
         )
         drivers <- dplyr::bind_rows(drivers, d)
       }
@@ -325,6 +337,7 @@ Race <- R6::R6Class("Race",
     status_history = c(),
     current_status = NA,
     pit_history = c(),
+    circuit = NA,
     add_lap = function() {
       private$current_lap <- private$current_lap + 1
       invisible(self)
@@ -364,8 +377,9 @@ Circuit <- R6::R6Class("Circuit",
   public = list(
     initialize = function(name, avg_pit_duration = 0, avg_num_pits = 0, avg_safety_cars = 0.70) {
       private$name <- match.arg(name, f1model::circuits$name)
-      cat("New <Circuit> named ", private$name, ".")
+      cat("New <Circuit> named ", private$name, "\n")
       f1modc <- f1model::circuits[f1model::circuits$name == private$name, ]
+      private$circuitId <- f1modc$circuitId
       private$country <- f1modc$country
       private$lat <- f1modc$lat
       private$lng <- f1modc$lng
@@ -374,7 +388,7 @@ Circuit <- R6::R6Class("Circuit",
       private$type <- f1modc$type
       private$direction <- f1modc$direction
       private$nationality <- f1modc$nationality
-      stopifnot(is.numeric(avg_pit_duration), pit_duration >= 0)
+      stopifnot(is.numeric(avg_pit_duration), avg_pit_duration >= 0)
       private$avg_pit_duration <- ifelse(avg_pit_duration == 0, 25, avg_pit_duration)
       stopifnot(is.numeric(avg_num_pits), avg_num_pits >= 0)
       private$avg_num_pits <- ifelse(avg_num_pits == 0, 2, avg_num_pits)
@@ -425,14 +439,15 @@ Circuit <- R6::R6Class("Circuit",
     nationality = "",
     avg_pit_duration = 0,
     avg_num_pits = 0,
-    avg_safety_cars = 0.70
+    avg_safety_cars = 0.70,
+    circuitId = 0
   )
 )
 
 Status <- R6::R6Class("Status",
   public = list(
     initialize = function(status_type, lap = 0) {
-      private$status_type <- match.args(status_type, c("green", "yellow", "red", "vsc", "sc", "completed"))
+      private$status_type <- match.arg(status_type, c("green", "yellow", "red", "vsc", "sc", "completed"))
       stopifnot(as.integer(lap) == lap, lap >= 0)
       private$status_start <- lap
     },
