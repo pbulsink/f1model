@@ -506,8 +506,9 @@ Status <- R6::R6Class("Status",
     },
     print = function(...) {
       cat("<Status>",
-          "\n ", private$status_type, " since lap ", private$lap,
-          sep = "")
+        "\n ", private$status_type, " since lap ", private$lap,
+        sep = ""
+      )
     },
     get_status_type = function() {
       return(private$status_type)
@@ -542,7 +543,8 @@ SafetyCar <- R6::R6Class("SafetyCar",
         "\n ", ifelse(private$type == "sc", "", "Virtual "), "Safety Car starting at ",
         private$start_time, " s, for ", private$length, " laps, involving <Driver> ",
         private$driver$get_name(),
-        sep = "")
+        sep = ""
+      )
     }
   ),
   private = list(
