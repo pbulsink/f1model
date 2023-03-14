@@ -125,7 +125,7 @@ Driver <- R6::R6Class("Driver",
     get_dob = function() {
       return(private$dob)
     },
-    get_code = function(){
+    get_code = function() {
       return(private$code)
     },
     get_grid = function() {
@@ -153,9 +153,9 @@ Driver <- R6::R6Class("Driver",
     get_grid_delay_time = function() {
       return(sqrt((2 * (private$grid * 8 - 0.8)) / 11.2) + 0.2)
     },
-    get_start_performance_time = function(){
-      #from heilmeier 2020, also references therein
-      return(rnorm(1, mean = private$avg_start_pos_change, sd = 0.0225)*0.25) # TODO: Get sd
+    get_start_performance_time = function() {
+      # from heilmeier 2020, also references therein
+      return(rnorm(1, mean = private$avg_start_pos_change, sd = 0.0225) * 0.25) # TODO: Get sd
     },
     get_tire_params = function() {
       return(private$tire_params)
@@ -168,9 +168,9 @@ Driver <- R6::R6Class("Driver",
       return(private$t_driver)
     },
     get_driver_laptime = function() {
-      #log(abs(rnorm)) * -1 gives a very long right tail and average of about 0.6. If this gives problems,
-      #may need to repick the random part until within a limit...
-      return((log(abs(rnorm(1)))*-1)+private$t_driver)
+      # log(abs(rnorm)) * -1 gives a very long right tail and average of about 0.6. If this gives problems,
+      # may need to repick the random part until within a limit...
+      return((log(abs(rnorm(1))) * -1) + private$t_driver)
     }
   ),
   private = list(
@@ -215,16 +215,20 @@ Car <- R6::R6Class("Car",
         sep = ""
       )
     },
-    get_damaged = function(){
+    get_damaged = function() {
       return(private$is_damaged)
     },
-    get_damage_time = function(){
-      if(!private$is_damaged){
-        return(c(0,0))
-      } else (
-        return(c(private$damage_time_fixable,
-                 private$damage_time_perm))
-      )
+    get_damage_time = function() {
+      if (!private$is_damaged) {
+        return(c(0, 0))
+      } else {
+        (
+          return(c(
+            private$damage_time_fixable,
+            private$damage_time_perm
+          ))
+        )
+      }
     },
     get_fuel = function() {
       return(private$fuel)
@@ -237,10 +241,10 @@ Car <- R6::R6Class("Car",
       private$fuel <- private$fuel - burnrate * rate
       invisible(self)
     },
-    add_damage = function(){
+    add_damage = function() {
       private$is_damaged <- T
-      private$damage_time_fixable = runif(1, 2, 60)
-      private$damage_time_perm = runif(1, 0, 2)
+      private$damage_time_fixable <- runif(1, 2, 60)
+      private$damage_time_perm <- runif(1, 0, 2)
     }
   ),
   private = list(
@@ -375,9 +379,9 @@ Race <- R6::R6Class("Race",
     current_status = NA,
     pit_history = c(),
     circuit = NA,
-    #This comes from Heilmeier et. al. 2020, but simplified
+    # This comes from Heilmeier et. al. 2020, but simplified
     sc_distribution = c(0.364, 0.136),
-    sc_length = c(0,0.182, 0.25, 0.227, 0.193, 0.057, 0.068, 0.023),
+    sc_length = c(0, 0.182, 0.25, 0.227, 0.193, 0.057, 0.068, 0.023),
     p_vsc_fail = 0.227,
     vsc_length = c(0.479, 0.396, 0.021, 0.104),
     add_lap = function() {
@@ -395,7 +399,7 @@ Race <- R6::R6Class("Race",
       # Currently just passable pseudocode
 
       # ---- Sort outlaps ----
-      if(private$current_lap > 1){
+      if (private$current_lap > 1) {
         next
       }
 
@@ -517,18 +521,18 @@ Status <- R6::R6Class("Status",
   )
 )
 
-SafetyCar = R6::R6Class("SafetyCar",
+SafetyCar <- R6::R6Class("SafetyCar",
   public = list(
-    initialize = function(start_time, length, driver, type){
+    initialize = function(start_time, length, driver, type) {
       stopifnot(is.numeric(start_time))
       private$start_time <- start_time
       stopifnot(as.integer(length) == length)
       private$length <- length
-      private$type <- match.arg(type, c('sc', 'vsc'))
-      stopifnot('Driver' %in% class(driver))
+      private$type <- match.arg(type, c("sc", "vsc"))
+      stopifnot("Driver" %in% class(driver))
       private$driver <- driver
     },
-    print = function(...){
+    print = function(...) {
 
     }
   ),
