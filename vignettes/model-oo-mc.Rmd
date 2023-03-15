@@ -1,0 +1,66 @@
+---
+title: "Model with Object Oriented R and Monte Carlo"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Model with Object Oriented R and Monte Carlo}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+bahrain2022<-Race$new("Bahraini Grand Pirx", "Bahrain", 2022, 90.558, 57)
+
+bahrain2022$add_driver(Driver$new("leclerc", 1, 'Ferrari', 'ssssmh',0.001))
+bahrain2022$add_driver(Driver$new("max_verstappen", 2, 'Red Bull', 'ssssmh',0.123))
+bahrain2022$add_driver(Driver$new("sainz", 3, 'Ferrari', 'ssssmh',0.129))
+bahrain2022$add_driver(Driver$new("perez", 4, 'Red Bull', 'ssssmh',0.363))
+bahrain2022$add_driver(Driver$new("hamilton", 5, 'Mercedes', 'sssmhh',0.490))
+bahrain2022$add_driver(Driver$new("bottas", 6, 'Alfa Romeo', 'sssmmh',1.002))
+bahrain2022$add_driver(Driver$new("kevin_magnussen", 7, 'Haas', 'ssssmh',0.903))
+bahrain2022$add_driver(Driver$new("alonso", 8, 'Alpine', 'ssssmh',1.063))
+bahrain2022$add_driver(Driver$new("russell", 9, 'Mercedes', 'sssmhh',0.694))
+bahrain2022$add_driver(Driver$new("gasly", 10, 'AlphaTauri', 'ssssmh',1.077))
+bahrain2022$add_driver(Driver$new("ocon", 11, 'Alpine', 'sssssmh',1.224))
+bahrain2022$add_driver(Driver$new("mick_schumacher", 12, 'Haas', 'sssssmh',1.440))
+bahrain2022$add_driver(Driver$new("norris", 13, 'McLaren', 'sssssmh',1.450))
+bahrain2022$add_driver(Driver$new("albon", 14, 'Williams', 'ssssmmh',2.106))
+bahrain2022$add_driver(Driver$new("zhou", 15, 'Alfa Romeo', 'ssssmmh',1.935))
+bahrain2022$add_driver(Driver$new("tsunoda", 16, 'AlphaTauri', 'sssssmh',2.192))
+bahrain2022$add_driver(Driver$new("hulkenberg", 17, 'Aston Martin', 'sssssmh',2.219))
+bahrain2022$add_driver(Driver$new("ricciardo", 18, 'McLaren', 'sssssmh',2.387))
+bahrain2022$add_driver(Driver$new("stroll", 19, 'Aston Martin', 'sssssmh',2.474))
+bahrain2022$add_driver(Driver$new("latifi", 20, 'Williams', 'ssssmmh',3.076))
+
+```
+
+Verify it's all there
+```{r verify}
+bahrain2022$get_num_drivers()
+```
+
+
+
+## Tire Model
+
+Here's a tire model:
+```{r tire_model}
+laps <- tibble(lap = 0:100, soft = NA_real_, medium = NA_real_, hard = NA_real_, intermediate = NA_real_, wet = NA_real_)
+laps$soft<-tt(0:100, 20,.3,0,.012,.25)
+laps$medium<-tt(0:100, 5,.25,1.2,.01,.18)
+laps$hard<-tt(0:100,5,.2,2,.009,.125)
+laps$intermediate<-tt(0:100, 1,0.2,15,.01,.1)
+laps$wet<-tt(0:100, 1,0.15,20,0.01,.1)
+
+laps <- laps %>% pivot_longer(soft:wet, names_to = 'tire', values_to = 'laptime')
+
+laps <- laps[laps$laptime < 200,]
+
+ggplot(laps, aes(x = lap, y = laptime, colour = tire)) + geom_point() + ggplot2::ylim(c(0,25)) + ggplot2::xlim(c(0,75))
+```

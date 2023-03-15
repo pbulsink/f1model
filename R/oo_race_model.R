@@ -65,14 +65,15 @@ Tire <- R6::R6Class("Tire",
 
 Driver <- R6::R6Class("Driver",
   public = list(
-    initialize = function(code, grid, constructor, tire_list = "ssmmhhiiww", t_driver = 0.5) {
-      private$code <- match.arg(code, f1model::drivers$code)
-      drvr <- f1model::drivers[f1model::drivers$code == code, ]
+    initialize = function(driverRef, grid, constructor, tire_list = "ssmmhhiiww", t_driver = 0.5) {
+      private$driverRef <- match.arg(driverRef, f1model::drivers$driverRef)
+      drvr <- f1model::drivers[f1model::drivers$driverRef == driverRef, ]
       private$name <- paste(drvr$forename, drvr$surname)
       cat("New <Driver> named ", private$name, "\n")
       private$dob <- drvr$dob
       private$nationality <- drvr$nationality
       private$number <- drvr$number
+      private$code <- drvr$code
       private$constructor <- match.arg(constructor, f1model::constructors$name)
       private$car <- Car$new(private$constructor)
       private$driverId <- drvr$driverId
@@ -187,6 +188,7 @@ Driver <- R6::R6Class("Driver",
     car = NA,
     t_driver = 0,
     driverId = 0,
+    driverRef = 0,
     tire_params = tibble::tibble(
       compound = c("soft", "medium", "hard", "intermediate", "wet"),
       k1 = c(10, 5, 1, 1, 1),
@@ -372,7 +374,7 @@ Race <- R6::R6Class("Race",
     name = "",
     year = 0,
     num_laps = 0,
-    current_lap = 1,
+    current_lap = 0,
     t_quali = 0,
     t_generic = 0,
     status_history = c(),

@@ -39,10 +39,13 @@ Suggests:
     covr,
     glmnet,
     kernlab,
+    knitr,
     ranger,
+    rmarkdown,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 URL: https://pbulsink.github.io/f1model/
 LazyData: true
 Depends: 
     R (>= 2.10)
+VignetteBuilder: knitr
