@@ -81,7 +81,7 @@ Driver <- R6::R6Class("Driver",
       stopifnot(grid <= 24, grid > 0)
       private$grid <- grid
       private$position <- grid
-      stopifnot(is.numeric(t_driver), t_driver > 0)
+      stopifnot(is.numeric(t_driver), t_driver >= 0)
       private$t_driver <- t_driver
       for (t in unlist(strsplit(tire_list, ""))) {
         newtire <- Tire$new(as.character(t))
@@ -163,6 +163,7 @@ Driver <- R6::R6Class("Driver",
     },
     add_lap = function(lap_percent = 1) {
       private$tire_list[private$current_tire][[1]]$add_lap(lap_percent)
+      private$car$burn_fuel(1, lap_percent)
       return(self)
     },
     get_t_driver = function() {
@@ -172,6 +173,16 @@ Driver <- R6::R6Class("Driver",
       # log(abs(rnorm)) * -1 gives a very long right tail and average of about 0.6. If this gives problems,
       # may need to repick the random part until within a limit...
       return((log(abs(rnorm(1))) * -1) + private$t_driver)
+    },
+    get_car_laptime = function(){
+      return(private$car$get_car_laptime())
+    },
+    get_laptime = function(){
+      return(
+        self$get_car_laptime() +
+        self$get_driver_laptime() +
+        self$get_tire_laptime()
+      )
     }
   ),
   private = list(
@@ -224,16 +235,17 @@ Car <- R6::R6Class("Car",
       if (!private$is_damaged) {
         return(c(0, 0))
       } else {
-        (
-          return(c(
-            private$damage_time_fixable,
-            private$damage_time_perm
-          ))
-        )
+        return(c(
+          private$damage_time_fixable,
+          private$damage_time_perm
+        ))
       }
     },
     get_fuel = function() {
       return(private$fuel)
+    },
+    get_car_laptime = function(){
+      return(private$fuel * 0.03 + private$damage_time_perm)
     },
     burn_fuel = function(race_laps, rate = 1) {
       # rate = 1 for most laps. 1/1.4 for VSC, 1/1.6 for SC, etc.
@@ -243,10 +255,13 @@ Car <- R6::R6Class("Car",
       private$fuel <- private$fuel - burnrate * rate
       invisible(self)
     },
-    add_damage = function() {
+    add_damage = function(lap) {
+      stopifnot(as.integer(lap) == lap, lap > 0)
       private$is_damaged <- T
       private$damage_time_fixable <- runif(1, 2, 60)
       private$damage_time_perm <- runif(1, 0, 2)
+      private$damage_lap <- lap
+      invisible(self)
     }
   ),
   private = list(
@@ -256,7 +271,8 @@ Car <- R6::R6Class("Car",
     constructorId = 0,
     is_damaged = F,
     damage_time_fixable = 0,
-    damage_time_perm = 0
+    damage_time_perm = 0,
+    damage_lap = 0
   )
 )
 
@@ -270,7 +286,7 @@ Race <- R6::R6Class("Race",
       private$year <- year
       stopifnot(is.numeric(t_quali))
       private$t_quali <- t_quali
-      private$t_generic <- t_quali + 1
+      private$t_generic <- ceiling(t_quali) + 1
       stopifnot(as.integer(num_laps) == num_laps)
       stopifnot(num_laps > 0)
       private$num_laps <- num_laps
@@ -343,16 +359,18 @@ Race <- R6::R6Class("Race",
     run_race = function() {
       cat("<Race> Race Running not ready yet.")
       invisible(self)
+
+      # Run ghost car
+      private$run_ghost()
+
+      # figure out SC/VSC
+      private$determine_sc_vsc()
+
+      #Run race
       while (private$get_status_type() != "completed") {
         private$do_lap()
       }
       cat("<Race> Race ", private$name, " completed. Call $summary() to see results.")
-      invisible(self)
-    },
-    run_lap = function() {
-      cat("<Race> Race Running not ready yet.")
-      invisible(self)
-      private$do_lap()
       invisible(self)
     },
     summary = function() {
@@ -381,6 +399,8 @@ Race <- R6::R6Class("Race",
     current_status = NA,
     pit_history = c(),
     circuit = NA,
+    ghost_time = 0,
+    sc_vsc = NA,
     # This comes from Heilmeier et. al. 2020, but simplified
     sc_distribution = c(0.364, 0.136),
     sc_length = c(0, 0.182, 0.25, 0.227, 0.193, 0.057, 0.068, 0.023),
@@ -417,12 +437,38 @@ Race <- R6::R6Class("Race",
         laptimes <- dplyr::bind_rows(laptimes, lt)
       }
 
-      # ---- evaluate for interactions - pass delays, drs, crashes ----
+      # ---- evaluate for interactions - pass delays, drs, failures ----
 
       # ---- Inlaps/Pits ----
 
       # set laptimes per driver - remember adjusted for aboves.
 
+      invisible(self)
+    },
+    run_ghost = function(){
+      # strategy: s -> m (18) -> s (39)
+      ghost <- Driver$new('Ghost', grid = 1, constructor = 'ghost', tire_list = 'sms', t_driver = 0)
+      racetime <- 0
+
+      for (l in 1:18){
+        racetime <- racetime + private$t_generic + ghost$get_laptime
+        ghost$add_lap()
+      }
+      racetime <- racetime + pit_time
+      ghost$change_tire(2)
+
+      for (l in 19:39){
+        racetime <- racetime + private$t_generic + ghost$get_laptime
+        ghost$add_lap()
+      }
+      racetime <- racetime + pit_time
+      ghost$change_tire(3)
+
+      for (l in 40:private$num_laps){
+        racetime <- racetime + private$t_generic + ghost$get_laptime
+        ghost$add_lap()
+      }
+      private$ghost_time <- racetime
       invisible(self)
     }
   )
