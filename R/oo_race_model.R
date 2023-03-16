@@ -174,14 +174,14 @@ Driver <- R6::R6Class("Driver",
       # may need to repick the random part until within a limit...
       return((log(abs(rnorm(1))) * -1) + private$t_driver)
     },
-    get_car_laptime = function(){
+    get_car_laptime = function() {
       return(private$car$get_car_laptime())
     },
-    get_laptime = function(){
+    get_laptime = function() {
       return(
         self$get_car_laptime() +
-        self$get_driver_laptime() +
-        self$get_tire_laptime()
+          self$get_driver_laptime() +
+          self$get_tire_laptime()
       )
     }
   ),
@@ -244,7 +244,7 @@ Car <- R6::R6Class("Car",
     get_fuel = function() {
       return(private$fuel)
     },
-    get_car_laptime = function(){
+    get_car_laptime = function() {
       return(private$fuel * 0.03 + private$damage_time_perm)
     },
     burn_fuel = function(race_laps, rate = 1) {
@@ -366,7 +366,7 @@ Race <- R6::R6Class("Race",
       # figure out SC/VSC
       private$determine_sc_vsc()
 
-      #Run race
+      # Run race
       while (private$get_status_type() != "completed") {
         private$do_lap()
       }
@@ -445,26 +445,26 @@ Race <- R6::R6Class("Race",
 
       invisible(self)
     },
-    run_ghost = function(){
+    run_ghost = function() {
       # strategy: s -> m (18) -> s (39)
-      ghost <- Driver$new('Ghost', grid = 1, constructor = 'ghost', tire_list = 'sms', t_driver = 0)
+      ghost <- Driver$new("Ghost", grid = 1, constructor = "ghost", tire_list = "sms", t_driver = 0)
       racetime <- 0
 
-      for (l in 1:18){
+      for (l in 1:18) {
         racetime <- racetime + private$t_generic + ghost$get_laptime
         ghost$add_lap()
       }
       racetime <- racetime + pit_time
       ghost$change_tire(2)
 
-      for (l in 19:39){
+      for (l in 19:39) {
         racetime <- racetime + private$t_generic + ghost$get_laptime
         ghost$add_lap()
       }
       racetime <- racetime + pit_time
       ghost$change_tire(3)
 
-      for (l in 40:private$num_laps){
+      for (l in 40:private$num_laps) {
         racetime <- racetime + private$t_generic + ghost$get_laptime
         ghost$add_lap()
       }
