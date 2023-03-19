@@ -153,23 +153,23 @@ Driver <- R6::R6Class("Driver",
     get_all_tires = function() {
       return(private$tire_list)
     },
-    get_strategy_choice = function(){
+    get_strategy_choice = function() {
       return(private$strategy_choice)
     },
-    choose_strategy = function(strategy){
+    choose_strategy = function(strategy) {
       invisible(self)
     },
-    add_strategy_step = function(lap, tire){
+    add_strategy_step = function(lap, tire) {
       stopifnot(as.integer(lap) == lap)
       stopifnot(lap >= 0)
-      stopifnot(tire %in% c('s', 'm', 'h', 'i', 'w'))
-      if(lap > 0){
+      stopifnot(tire %in% c("s", "m", "h", "i", "w"))
+      if (lap > 0) {
         private$strategy <- paste0(private$strategy, lap)
       }
       private$strategy <- paste0(private$strategy, tire)
       invisible(self)
     },
-    get_strategy = function(){
+    get_strategy = function() {
       return(private$strategy)
     },
     get_grid_delay_time = function() {
@@ -207,28 +207,40 @@ Driver <- R6::R6Class("Driver",
     },
     get_tire_plot = function(laps = 75) {
       laps <- tibble(lap = 0:laps, soft = NA_real_, medium = NA_real_, hard = NA_real_, intermediate = NA_real_, wet = NA_real_)
-      laps$soft<-tt(0:laps, private$tire_params[[1,2]], private$tire_params[[1,3]], private$tire_params[[1,4]],
-                    private$tire_params[[1,5]], private$tire_params[[1,6]])
-      laps$medium<-tt(0:laps, private$tire_params[[2,2]], private$tire_params[[2,3]], private$tire_params[[2,4]],
-                      private$tire_params[[2,5]], private$tire_params[[2,6]])
-      laps$hard<-tt(0:laps, private$tire_params[[3,2]], private$tire_params[[3,3]], private$tire_params[[3,4]],
-                    private$tire_params[[3,5]], private$tire_params[[3,6]])
-      laps$intermediate<-tt(0:laps, private$tire_params[[4,2]], private$tire_params[[4,3]], private$tire_params[[4,4]],
-                            private$tire_params[[4,5]], private$tire_params[[4,6]])
-      laps$wet<-tt(0:laps, private$tire_params[[5,2]], private$tire_params[[5,3]], private$tire_params[[5,4]],
-                   private$tire_params[[5,5]], private$tire_params[[5,6]])
+      laps$soft <- tt(
+        0:laps, private$tire_params[[1, 2]], private$tire_params[[1, 3]], private$tire_params[[1, 4]],
+        private$tire_params[[1, 5]], private$tire_params[[1, 6]]
+      )
+      laps$medium <- tt(
+        0:laps, private$tire_params[[2, 2]], private$tire_params[[2, 3]], private$tire_params[[2, 4]],
+        private$tire_params[[2, 5]], private$tire_params[[2, 6]]
+      )
+      laps$hard <- tt(
+        0:laps, private$tire_params[[3, 2]], private$tire_params[[3, 3]], private$tire_params[[3, 4]],
+        private$tire_params[[3, 5]], private$tire_params[[3, 6]]
+      )
+      laps$intermediate <- tt(
+        0:laps, private$tire_params[[4, 2]], private$tire_params[[4, 3]], private$tire_params[[4, 4]],
+        private$tire_params[[4, 5]], private$tire_params[[4, 6]]
+      )
+      laps$wet <- tt(
+        0:laps, private$tire_params[[5, 2]], private$tire_params[[5, 3]], private$tire_params[[5, 4]],
+        private$tire_params[[5, 5]], private$tire_params[[5, 6]]
+      )
 
-      laps <- laps %>% pivot_longer(soft:wet, names_to = 'tire', values_to = 'laptime')
+      laps <- laps %>% pivot_longer(soft:wet, names_to = "tire", values_to = "laptime")
 
-      laps <- laps[laps$laptime < 200,]
+      laps <- laps[laps$laptime < 200, ]
 
       p <- ggplot2::ggplot(laps, ggplot2::aes(x = lap, y = laptime, colour = tire)) +
         ggplot2::geom_point() +
-        ggplot2::ylim(c(0,25)) +
-        ggplot2::xlim(c(0,laps)) +
+        ggplot2::ylim(c(0, 25)) +
+        ggplot2::xlim(c(0, laps)) +
         ggplot2::ggtitle(paste0("Tire Plot for ", private$name)) +
-        ggplot2::scale_color_manual(values = c('soft' = 'red', 'medium' = 'yellow', 'hard' = 'grey',
-                                               'intermediate' = 'green', 'wet' = 'blue'))
+        ggplot2::scale_color_manual(values = c(
+          "soft" = "red", "medium" = "yellow", "hard" = "grey",
+          "intermediate" = "green", "wet" = "blue"
+        ))
       return(p)
     }
   ),
@@ -392,12 +404,12 @@ Race <- R6::R6Class("Race",
     get_num_drivers = function() {
       return(length(private$drivers))
     },
-    add_strategy = function(strategy){
-      s<-Strategy$new(strategy)
-      private$strategies = c(private$strategies, s)
+    add_strategy = function(strategy) {
+      s <- Strategy$new(strategy)
+      private$strategies <- c(private$strategies, s)
       invisible(self)
     },
-    get_strategies = function(){
+    get_strategies = function() {
       return(private$strategies)
     },
     get_current_status = function() {
@@ -666,34 +678,35 @@ SafetyCar <- R6::R6Class("SafetyCar",
 
 Strategy <- R6::R6Class("Strategy",
   public = list(
-    initialize = function(strategy){
-      chrsplit<-unlist(strsplit(split ="\\d", x=strategy))
-      chrsplit<-chrsplit[chrsplit != ""]
-      numsplit<-unlist(strsplit(split ="\\D", x=strategy))
-      numsplit<-numsplit[numsplit != ""]
+    initialize = function(strategy) {
+      chrsplit <- unlist(strsplit(split = "\\d", x = strategy))
+      chrsplit <- chrsplit[chrsplit != ""]
+      numsplit <- unlist(strsplit(split = "\\D", x = strategy))
+      numsplit <- numsplit[numsplit != ""]
       # more tires than pit laps
-      stopifnot(length(chrsplit) == length(numsplit)+1)
+      stopifnot(length(chrsplit) == length(numsplit) + 1)
       # all tires in list of possible tires
-      stopifnot(all(chrsplit %in% c('s','m','h','i','w')))
+      stopifnot(all(chrsplit %in% c("s", "m", "h", "i", "w")))
       # make sure stops are in increasing order
       stopifnot(all(numsplit[order(numsplit)] == numsplit))
 
-      private$pitlaps = numsplit
-      private$tires = chrsplit
+      private$pitlaps <- numsplit
+      private$tires <- chrsplit
     },
-    print = function(...){
+    print = function(...) {
       cat("<Strategy>",
-          "\n A strategy with ", self$get_num_pits(), " pit stops,",
-          " using tires ", paste(private$tires, collapse = ", "), ".",
-          sep = "")
+        "\n A strategy with ", self$get_num_pits(), " pit stops,",
+        " using tires ", paste(private$tires, collapse = ", "), ".",
+        sep = ""
+      )
     },
-    get_pit_laps = function(){
+    get_pit_laps = function() {
       return(private$pitlaps)
     },
-    get_num_pits = function(){
+    get_num_pits = function() {
       return(length(private$pitlaps))
     },
-    get_tires = function(){
+    get_tires = function() {
       return(private$tires)
     }
   ),
