@@ -204,6 +204,32 @@ Driver <- R6::R6Class("Driver",
           self$get_driver_laptime() +
           self$get_tire_laptime()
       )
+    },
+    get_tire_plot = function(laps = 75) {
+      laps <- tibble(lap = 0:laps, soft = NA_real_, medium = NA_real_, hard = NA_real_, intermediate = NA_real_, wet = NA_real_)
+      laps$soft<-tt(0:laps, private$tire_params[[1,2]], private$tire_params[[1,3]], private$tire_params[[1,4]],
+                    private$tire_params[[1,5]], private$tire_params[[1,6]])
+      laps$medium<-tt(0:laps, private$tire_params[[2,2]], private$tire_params[[2,3]], private$tire_params[[2,4]],
+                      private$tire_params[[2,5]], private$tire_params[[2,6]])
+      laps$hard<-tt(0:laps, private$tire_params[[3,2]], private$tire_params[[3,3]], private$tire_params[[3,4]],
+                    private$tire_params[[3,5]], private$tire_params[[3,6]])
+      laps$intermediate<-tt(0:laps, private$tire_params[[4,2]], private$tire_params[[4,3]], private$tire_params[[4,4]],
+                            private$tire_params[[4,5]], private$tire_params[[4,6]])
+      laps$wet<-tt(0:laps, private$tire_params[[5,2]], private$tire_params[[5,3]], private$tire_params[[5,4]],
+                   private$tire_params[[5,5]], private$tire_params[[5,6]])
+
+      laps <- laps %>% pivot_longer(soft:wet, names_to = 'tire', values_to = 'laptime')
+
+      laps <- laps[laps$laptime < 200,]
+
+      p <- ggplot2::ggplot(laps, ggplot2::aes(x = lap, y = laptime, colour = tire)) +
+        ggplot2::geom_point() +
+        ggplot2::ylim(c(0,25)) +
+        ggplot2::xlim(c(0,laps)) +
+        ggplot2::ggtitle(paste0("Tire Plot for ", private$name)) +
+        ggplot2::scale_color_manual(values = c('soft' = 'red', 'medium' = 'yellow', 'hard' = 'grey',
+                                               'intermediate' = 'green', 'wet' = 'blue'))
+      return(p)
     }
   ),
   private = list(

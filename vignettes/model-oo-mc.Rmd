@@ -38,29 +38,20 @@ bahrain2022$add_driver(Driver$new("ricciardo", 18, 'McLaren', 'sssssmh',2.387))
 bahrain2022$add_driver(Driver$new("stroll", 19, 'Aston Martin', 'sssssmh',2.474))
 bahrain2022$add_driver(Driver$new("latifi", 20, 'Williams', 'ssssmmh',3.076))
 
+bahrain2022$add_strategy("s19m40s")
+bahrain2022$add_strategy("s18h42s")
+bahrain2022$add_strategy("s16h37m")
 ```
 
 Verify it's all there
 ```{r verify}
-bahrain2022$get_num_drivers()
+bahrain2022
 ```
-
-
 
 ## Tire Model
 
-Here's a tire model:
-```{r tire_model}
-laps <- tibble(lap = 0:100, soft = NA_real_, medium = NA_real_, hard = NA_real_, intermediate = NA_real_, wet = NA_real_)
-laps$soft<-tt(0:100, 20,.3,0,.012,.25)
-laps$medium<-tt(0:100, 5,.25,1.2,.01,.18)
-laps$hard<-tt(0:100,5,.2,2,.009,.125)
-laps$intermediate<-tt(0:100, 1,0.2,15,.01,.1)
-laps$wet<-tt(0:100, 1,0.15,20,0.01,.1)
-
-laps <- laps %>% pivot_longer(soft:wet, names_to = 'tire', values_to = 'laptime')
-
-laps <- laps[laps$laptime < 200,]
-
-ggplot(laps, aes(x = lap, y = laptime, colour = tire)) + geom_point() + ggplot2::ylim(c(0,25)) + ggplot2::xlim(c(0,75))
+Here's a tire model plot:
+```{r tire_model, warnings = FALSE}
+leclerc<-bahrain2022$get_drivers_obj()[[1]]
+leclerc$get_tire_plot()
 ```
