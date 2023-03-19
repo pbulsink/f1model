@@ -1,6 +1,7 @@
 #' Object Oriented Race Model
 #'
 #' Objects to add:
+#' - Strategy
 #'
 #' Properties to add:
 #' - driver:
@@ -83,6 +84,7 @@ Driver <- R6::R6Class("Driver",
       private$position <- grid
       stopifnot(is.numeric(t_driver), t_driver >= 0)
       private$t_driver <- t_driver
+      private$strategy <- substring(tire_list, 1, 1)
       for (t in unlist(strsplit(tire_list, ""))) {
         newtire <- Tire$new(as.character(t))
         private$tire_list <- c(private$tire_list, newtire)
@@ -151,6 +153,25 @@ Driver <- R6::R6Class("Driver",
     get_all_tires = function() {
       return(private$tire_list)
     },
+    get_strategy_choice = function(){
+      return(private$strategy_choice)
+    },
+    choose_strategy = function(strategy){
+      invisible(self)
+    },
+    add_strategy_step = function(lap, tire){
+      stopifnot(as.integer(lap) == lap)
+      stopifnot(lap >= 0)
+      stopifnot(tire %in% c('s', 'm', 'h', 'i', 'w'))
+      if(lap > 0){
+        private$strategy <- paste0(private$strategy, lap)
+      }
+      private$strategy <- paste0(private$strategy, tire)
+      invisible(self)
+    },
+    get_strategy = function(){
+      return(private$strategy)
+    },
     get_grid_delay_time = function() {
       return(sqrt((2 * (private$grid * 8 - 0.8)) / 11.2) + 0.2)
     },
@@ -200,13 +221,15 @@ Driver <- R6::R6Class("Driver",
     t_driver = 0,
     driverId = 0,
     driverRef = 0,
+    strategy_choice = NA,
+    strategy = "",
     tire_params = tibble::tibble(
       compound = c("soft", "medium", "hard", "intermediate", "wet"),
-      k1 = c(10, 5, 1, 1, 1),
-      k2 = c(0.15, 0.12, 0.1, 0, 0),
-      k3 = c(0, 0.5, 1.5, 15, 20),
-      k4 = c(0.01, 0.01, 0.0075, 0.01, 0.01),
-      k5 = c(0.25, 0.15, 0.1, 0.1, 0.1)
+      k1 = c(20, 5, 5, 1, 1),
+      k2 = c(0.3, 0.25, 0.2, 0.2, 0.1),
+      k3 = c(0, 1.2, 2, 15, 20),
+      k4 = c(0.012, 0.01, 0.009, 0.01, 0.01),
+      k5 = c(0.25, 0.18, 0.125, 0.1, 0.1)
     )
   )
 )
@@ -320,7 +343,8 @@ Race <- R6::R6Class("Race",
         "dob" = character(),
         "nationality" = character(),
         "current_tire" = character(),
-        "tire_age" = numeric()
+        "tire_age" = numeric(),
+        "strategy" = character()
       )
       for (driver in private$drivers) {
         d <- tibble::tibble(
@@ -332,7 +356,8 @@ Race <- R6::R6Class("Race",
           "dob" = driver$get_dob(),
           "nationality" = driver$get_nationality(),
           "current_tire" = driver$get_current_tire_compound(),
-          "tire_age" = driver$get_current_tire_age()
+          "tire_age" = driver$get_current_tire_age(),
+          "strategy" = driver$get_strategy()
         )
         drivers <- dplyr::bind_rows(drivers, d)
       }
@@ -340,6 +365,14 @@ Race <- R6::R6Class("Race",
     },
     get_num_drivers = function() {
       return(length(private$drivers))
+    },
+    add_strategy = function(strategy){
+      s<-Strategy$new(strategy)
+      private$strategies = c(private$strategies, s)
+      invisible(self)
+    },
+    get_strategies = function(){
+      return(private$strategies)
     },
     get_current_status = function() {
       return(private$current_status)
@@ -389,6 +422,7 @@ Race <- R6::R6Class("Race",
   ),
   private = list(
     drivers = c(),
+    strategies = c(),
     name = "",
     year = 0,
     num_laps = 0,
@@ -600,5 +634,45 @@ SafetyCar <- R6::R6Class("SafetyCar",
     start_time = 0,
     length = 0,
     driver = NA
+  )
+)
+
+
+Strategy <- R6::R6Class("Strategy",
+  public = list(
+    initialize = function(strategy){
+      chrsplit<-unlist(strsplit(split ="\\d", x=strategy))
+      chrsplit<-chrsplit[chrsplit != ""]
+      numsplit<-unlist(strsplit(split ="\\D", x=strategy))
+      numsplit<-numsplit[numsplit != ""]
+      # more tires than pit laps
+      stopifnot(length(chrsplit) == length(numsplit)+1)
+      # all tires in list of possible tires
+      stopifnot(all(chrsplit %in% c('s','m','h','i','w')))
+      # make sure stops are in increasing order
+      stopifnot(all(numsplit[order(numsplit)] == numsplit))
+
+      private$pitlaps = numsplit
+      private$tires = chrsplit
+    },
+    print = function(...){
+      cat("<Strategy>",
+          "\n A strategy with ", self$get_num_pits(), " pit stops,",
+          " using tires ", paste(private$tires, collapse = ", "), ".",
+          sep = "")
+    },
+    get_pit_laps = function(){
+      return(private$pitlaps)
+    },
+    get_num_pits = function(){
+      return(length(private$pitlaps))
+    },
+    get_tires = function(){
+      return(private$tires)
+    }
+  ),
+  private = list(
+    pitlaps = c(),
+    tires = c()
   )
 )
