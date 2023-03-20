@@ -99,15 +99,17 @@ Driver <- R6::R6Class("Driver",
       )
     },
     change_tire = function(new_tire) {
-      if(is.character(new_tire)){
-        stopifnot(new_tire %in% c('s', 'm', 'h', 'i', 'w'))
+      if (is.character(new_tire)) {
+        stopifnot(new_tire %in% c("s", "m", "h", "i", "w"))
         available_tires <- tibble::tibble(
           "tireId" = 1:length(self$get_all_tires()),
-          "compound" = sapply(self$get_all_tires(), function(x) substr(x$get_compound(), 1,1)),
+          "compound" = sapply(self$get_all_tires(), function(x) substr(x$get_compound(), 1, 1)),
           "age" = sapply(self$get_all_tires(), function(x) x$get_age())
         ) %>%
-          dplyr::filter(.data$compound == new_tire,
-                        .data$tireId != private$current_tire)
+          dplyr::filter(
+            .data$compound == new_tire,
+            .data$tireId != private$current_tire
+          )
         stopifnot(nrow(available_tires) > 0)
         tire_choice <- available_tires %>%
           dplyr::arrange(.data$age) %>%
@@ -223,8 +225,10 @@ Driver <- R6::R6Class("Driver",
       )
     },
     get_tire_plot = function(laps = 75) {
-      laps <- tibble(lap = 0:laps, soft = NA_real_, medium = NA_real_, hard = NA_real_,
-                     intermediate = NA_real_, wet = NA_real_)
+      laps <- tibble(
+        lap = 0:laps, soft = NA_real_, medium = NA_real_, hard = NA_real_,
+        intermediate = NA_real_, wet = NA_real_
+      )
       laps$soft <- tt(
         0:laps, private$tire_params[[1, 2]], private$tire_params[[1, 3]], private$tire_params[[1, 4]],
         private$tire_params[[1, 5]], private$tire_params[[1, 6]]
@@ -544,14 +548,14 @@ Race <- R6::R6Class("Race",
       ghost_strategy <- private$strategies[[1]]
       racetime <- 0
 
-      for(stint in 1:(ghost_strategy$get_num_pits()+1)){
-        next_stop = ifelse(stint > ghost_strategy$get_num_pits(), private$num_laps, ghost_strategy$get_pit_laps()[stint])
-        last_stop = ifelse(stint == 1, 1, ghost_strategy$get_pit_laps()[stint-1])
-        for(lap in last_stop:next_stop){
+      for (stint in 1:(ghost_strategy$get_num_pits() + 1)) {
+        next_stop <- ifelse(stint > ghost_strategy$get_num_pits(), private$num_laps, ghost_strategy$get_pit_laps()[stint])
+        last_stop <- ifelse(stint == 1, 1, ghost_strategy$get_pit_laps()[stint - 1])
+        for (lap in last_stop:next_stop) {
           racetime <- racetime + private$t_generic + ghost$get_laptime
           ghost$add_lap()
         }
-        if(stint != ghost_strategy$get_num_pits()+1){
+        if (stint != ghost_strategy$get_num_pits() + 1) {
           racetime <- racetime + pit_time
           ghost$change_tire(ghost_strategy$get_tires()[stint + 1])
         }
