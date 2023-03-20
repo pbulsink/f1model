@@ -99,9 +99,26 @@ Driver <- R6::R6Class("Driver",
       )
     },
     change_tire = function(new_tire) {
-      stopifnot(as.integer(new_tire) == new_tire)
-      stopifnot(new_tire <= length(private$tire_lifst))
-      private$current_tire <- new_tire
+      if(is.character(new_tire)){
+        stopifnot(new_tire %in% c('s', 'm', 'h', 'i', 'w'))
+        available_tires <- tibble::tibble(
+          "tireId" = 1:length(self$get_all_tires()),
+          "compound" = sapply(self$get_all_tires(), function(x) substr(x$get_compound(), 1,1)),
+          "age" = sapply(self$get_all_tires(), function(x) x$get_age())
+        ) %>%
+          dplyr::filter(.data$compound == new_tire,
+                        .data$tireId != private$current_tire)
+        stopifnot(nrow(available_tires) > 0)
+        tire_choice <- available_tires %>%
+          dplyr::arrange(.data$age) %>%
+          dplyr::pull("tireId")[1]
+        private$current_tire <- tire_choice
+      } else {
+        stopifnot(as.integer(new_tire) == new_tire)
+        stopifnot(new_tire <= length(private$tire_lifst))
+        private$current_tire <- new_tire
+      }
+      invisible(self)
     },
     get_tire_laptime = function() {
       k <- private$tire_params %>%
@@ -206,7 +223,8 @@ Driver <- R6::R6Class("Driver",
       )
     },
     get_tire_plot = function(laps = 75) {
-      laps <- tibble(lap = 0:laps, soft = NA_real_, medium = NA_real_, hard = NA_real_, intermediate = NA_real_, wet = NA_real_)
+      laps <- tibble(lap = 0:laps, soft = NA_real_, medium = NA_real_, hard = NA_real_,
+                     intermediate = NA_real_, wet = NA_real_)
       laps$soft <- tt(
         0:laps, private$tire_params[[1, 2]], private$tire_params[[1, 3]], private$tire_params[[1, 4]],
         private$tire_params[[1, 5]], private$tire_params[[1, 6]]
@@ -447,10 +465,13 @@ Race <- R6::R6Class("Race",
     summary = function() {
       if (private$get_status_type() == "completed") {
         # Race Finished Summary
-        # likely return grid of driver grid, final position, time, strategy, fastest_lap (each), points, position gain/loss.
+        # likely return grid of driver grid, final position, time, strategy, fastest_lap (each), points,
+        # position gain/loss.
+        return(self$get_drivers())
       } else {
         # Race ongoing/about to start summary
         # Return grid of driver grid, position, current gap, strategy, position gain/loss
+        return(self$get_drivers())
       }
     },
     update_status = function(status) {
@@ -519,27 +540,23 @@ Race <- R6::R6Class("Race",
     },
     run_ghost = function() {
       # strategy: s -> m (18) -> s (39)
-      ghost <- Driver$new("Ghost", grid = 1, constructor = "ghost", tire_list = "sms", t_driver = 0)
+      ghost <- Driver$new("Ghost", grid = 1, constructor = "ghost", tire_list = "sssmmmhhh", t_driver = 0)
+      ghost_strategy <- private$strategies[[1]]
       racetime <- 0
 
-      for (l in 1:18) {
-        racetime <- racetime + private$t_generic + ghost$get_laptime
-        ghost$add_lap()
+      for(stint in 1:(ghost_strategy$get_num_pits()+1)){
+        next_stop = ifelse(stint > ghost_strategy$get_num_pits(), private$num_laps, ghost_strategy$get_pit_laps()[stint])
+        last_stop = ifelse(stint == 1, 1, ghost_strategy$get_pit_laps()[stint-1])
+        for(lap in last_stop:next_stop){
+          racetime <- racetime + private$t_generic + ghost$get_laptime
+          ghost$add_lap()
+        }
+        if(stint != ghost_strategy$get_num_pits()+1){
+          racetime <- racetime + pit_time
+          ghost$change_tire(ghost_strategy$get_tires()[stint + 1])
+        }
       }
-      racetime <- racetime + pit_time
-      ghost$change_tire(2)
 
-      for (l in 19:39) {
-        racetime <- racetime + private$t_generic + ghost$get_laptime
-        ghost$add_lap()
-      }
-      racetime <- racetime + pit_time
-      ghost$change_tire(3)
-
-      for (l in 40:private$num_laps) {
-        racetime <- racetime + private$t_generic + ghost$get_laptime
-        ghost$add_lap()
-      }
       private$ghost_time <- racetime
       invisible(self)
     }
@@ -682,7 +699,7 @@ Strategy <- R6::R6Class("Strategy",
       chrsplit <- unlist(strsplit(split = "\\d", x = strategy))
       chrsplit <- chrsplit[chrsplit != ""]
       numsplit <- unlist(strsplit(split = "\\D", x = strategy))
-      numsplit <- numsplit[numsplit != ""]
+      numsplit <- as.numeric(numsplit[numsplit != ""])
       # more tires than pit laps
       stopifnot(length(chrsplit) == length(numsplit) + 1)
       # all tires in list of possible tires
