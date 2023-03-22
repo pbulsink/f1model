@@ -215,12 +215,12 @@ Driver <- R6::R6Class("Driver",
     get_driver_laptime = function() {
       # log(abs(rnorm)) * -1 gives a very long right tail and average of about 0.6. If this gives problems,
       # may need to repick the random part until within a limit...
-      return((log(abs(rnorm(1, sd = .5)))/-5) + private$t_driver)
+      return((log(abs(rnorm(1, sd = .5))) / -5) + private$t_driver)
     },
-    get_car = function(){
+    get_car = function() {
       return(private$car)
     },
-    get_fuel = function(){
+    get_fuel = function() {
       return(private$car$get_fuel())
     },
     get_car_laptime = function() {
@@ -231,7 +231,7 @@ Driver <- R6::R6Class("Driver",
       laptime <- laptime + ifelse(lap == 1, self$get_grid_delay_time() + self$get_start_performance_time(), 0)
       return(laptime)
     },
-    set_n_laps = function(nlaps){
+    set_n_laps = function(nlaps) {
       private$car$set_n_laps(nlaps)
       private$num_laps <- nlaps
       invisible(self)
@@ -317,8 +317,10 @@ Car <- R6::R6Class("Car",
       constr <- f1model::constructors[f1model::constructors$name == private$constructor, ]
       cat("New <Car> built by ", private$constructor, "\n")
       private$constructorId <- constr$constructorId
-      stopifnot("<Car::initialize>\n fuel must be <= 100" = fuel <= 100,
-                "<Car::initialize>\n fuel must be > 0" = fuel > 0)
+      stopifnot(
+        "<Car::initialize>\n fuel must be <= 100" = fuel <= 100,
+        "<Car::initialize>\n fuel must be > 0" = fuel > 0
+      )
       private$start_fuel <- fuel
       private$fuel <- fuel
     },
@@ -355,17 +357,21 @@ Car <- R6::R6Class("Car",
       invisible(self)
     },
     add_damage = function(lap) {
-      stopifnot("<Car::add_damage>\n lap must be integer numeric" = as.integer(lap) == lap,
-                "<Car::add_damage>\n lap must be greater than 0" = lap > 0)
+      stopifnot(
+        "<Car::add_damage>\n lap must be integer numeric" = as.integer(lap) == lap,
+        "<Car::add_damage>\n lap must be greater than 0" = lap > 0
+      )
       private$is_damaged <- T
       private$damage_time_fixable <- runif(1, 2, 60)
       private$damage_time_perm <- runif(1, 0, 2)
       private$damage_lap <- lap
       invisible(self)
     },
-    set_n_laps = function(nlaps){
-      stopifnot("<Car::set_n_laps>\n lap must be integer numeric" = as.integer(lap) == lap,
-                "<Car::set_n_laps>\n lap must be greater than 0" = lap > 0)
+    set_n_laps = function(nlaps) {
+      stopifnot(
+        "<Car::set_n_laps>\n lap must be integer numeric" = as.integer(lap) == lap,
+        "<Car::set_n_laps>\n lap must be greater than 0" = lap > 0
+      )
       private$num_laps <- nlaps
       invisible(self)
     }
@@ -476,8 +482,8 @@ Race <- R6::R6Class("Race",
     get_current_lap = function() {
       return(private$current_lap)
     },
-    get_ghost_race_time = function(){
-      if(private$ghost_time == 0){
+    get_ghost_race_time = function() {
+      if (private$ghost_time == 0) {
         private$run_ghost()
       }
       return(private$ghost_time)
@@ -485,7 +491,7 @@ Race <- R6::R6Class("Race",
     get_avg_pit_duration = function() {
       return(private$circuit$get_avg_pit_duration())
     },
-    get_circuit = function(){
+    get_circuit = function() {
       return(private$circuit)
     },
     run_race = function() {
@@ -686,8 +692,10 @@ Status <- R6::R6Class("Status",
   public = list(
     initialize = function(status_type, lap = 0) {
       private$status_type <- match.arg(status_type, c("green", "yellow", "red", "vsc", "sc", "completed"))
-      stopifnot("<Status::initialize>\n lap must be integer" = as.integer(lap) == lap,
-                "<Status::initialize>\n lap must be >= 0" = lap >= 0)
+      stopifnot(
+        "<Status::initialize>\n lap must be integer" = as.integer(lap) == lap,
+        "<Status::initialize>\n lap must be >= 0" = lap >= 0
+      )
       private$status_start <- lap
     },
     print = function(...) {
@@ -703,8 +711,10 @@ Status <- R6::R6Class("Status",
       return(private$status_start)
     },
     get_status_age = function(lap) {
-      stopifnot("<Status::get_status_age>\n lap must be integer" = as.integer(lap) == lap,
-                "<Status::get_status_age>\n lap must be >= 0" = lap >= 0)
+      stopifnot(
+        "<Status::get_status_age>\n lap must be integer" = as.integer(lap) == lap,
+        "<Status::get_status_age>\n lap must be >= 0" = lap >= 0
+      )
       return(lap - private$status_start)
     }
   ),
