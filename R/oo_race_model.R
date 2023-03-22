@@ -12,6 +12,7 @@
 #'   - pit time
 
 #' Objects
+# ---- TIRE -----
 Tire <- R6::R6Class("Tire",
   public = list(
     initialize = function(compound, age = 0) {
@@ -64,6 +65,7 @@ Tire <- R6::R6Class("Tire",
   )
 )
 
+# ---- DRIVER ----
 Driver <- R6::R6Class("Driver",
   public = list(
     initialize = function(driverRef, grid, constructor, tire_list = "ssmmhhiiww", t_driver = 0.5) {
@@ -113,11 +115,12 @@ Driver <- R6::R6Class("Driver",
         stopifnot(nrow(available_tires) > 0)
         tire_choice <- available_tires %>%
           dplyr::arrange(.data$age) %>%
-          dplyr::pull("tireId")[1]
-        private$current_tire <- tire_choice
+          dplyr::select("tireId")
+
+        private$current_tire <- tire_choice[[1]]
       } else {
         stopifnot(as.integer(new_tire) == new_tire)
-        stopifnot(new_tire <= length(private$tire_lifst))
+        stopifnot(new_tire <= length(private$tire_list))
         private$current_tire <- new_tire
       }
       invisible(self)
@@ -179,9 +182,9 @@ Driver <- R6::R6Class("Driver",
       invisible(self)
     },
     add_strategy_step = function(lap, tire) {
-      stopifnot(as.integer(lap) == lap)
-      stopifnot(lap >= 0)
-      stopifnot(tire %in% c("s", "m", "h", "i", "w"))
+      stopifnot("<Driver::add_strategy_step>\n lap must be integer value" = as.integer(lap) == lap)
+      stopifnot("<Driver::add_strategy_step>\n lap must be greater than or equal to 0" = lap >= 0)
+      stopifnot("<Driver::add_strategy_step>\n tire must be one of s, m, h, i, w" = tire %in% c("s", "m", "h", "i", "w"))
       if (lap > 0) {
         private$strategy <- paste0(private$strategy, lap)
       }
@@ -196,14 +199,14 @@ Driver <- R6::R6Class("Driver",
     },
     get_start_performance_time = function() {
       # from heilmeier 2020, also references therein
-      return(rnorm(1, mean = private$avg_start_pos_change, sd = 0.0225) * 0.25) # TODO: Get sd
+      return(rnorm(1, mean = private$avg_start_pos_change, sd = 0.0225) * 0.25) # TODO: Get betetr sd
     },
     get_tire_params = function() {
       return(private$tire_params)
     },
     add_lap = function(lap_percent = 1) {
       private$tire_list[private$current_tire][[1]]$add_lap(lap_percent)
-      private$car$burn_fuel(1, lap_percent)
+      private$car$burn_fuel(lap_percent)
       return(self)
     },
     get_t_driver = function() {
@@ -212,17 +215,26 @@ Driver <- R6::R6Class("Driver",
     get_driver_laptime = function() {
       # log(abs(rnorm)) * -1 gives a very long right tail and average of about 0.6. If this gives problems,
       # may need to repick the random part until within a limit...
-      return((log(abs(rnorm(1))) * -1) + private$t_driver)
+      return((log(abs(rnorm(1, sd = .5)))/-5) + private$t_driver)
+    },
+    get_car = function(){
+      return(private$car)
+    },
+    get_fuel = function(){
+      return(private$car$get_fuel())
     },
     get_car_laptime = function() {
       return(private$car$get_car_laptime())
     },
-    get_laptime = function() {
-      return(
-        self$get_car_laptime() +
-          self$get_driver_laptime() +
-          self$get_tire_laptime()
-      )
+    get_laptime = function(lap = 0) {
+      laptime <- self$get_car_laptime() + self$get_driver_laptime() + self$get_tire_laptime()
+      laptime <- laptime + ifelse(lap == 1, self$get_grid_delay_time() + self$get_start_performance_time(), 0)
+      return(laptime)
+    },
+    set_n_laps = function(nlaps){
+      private$car$set_n_laps(nlaps)
+      private$num_laps <- nlaps
+      invisible(self)
     },
     get_tire_plot = function(laps = 75) {
       laps <- tibble(
@@ -283,6 +295,8 @@ Driver <- R6::R6Class("Driver",
     driverRef = 0,
     strategy_choice = NA,
     strategy = "",
+    avg_start_pos_change = 0,
+    num_laps = 0,
     tire_params = tibble::tibble(
       compound = c("soft", "medium", "hard", "intermediate", "wet"),
       k1 = c(20, 5, 5, 1, 1),
@@ -294,6 +308,8 @@ Driver <- R6::R6Class("Driver",
   )
 )
 
+
+# ---- CAR ----
 Car <- R6::R6Class("Car",
   public = list(
     initialize = function(constructor, fuel = 100) {
@@ -301,7 +317,8 @@ Car <- R6::R6Class("Car",
       constr <- f1model::constructors[f1model::constructors$name == private$constructor, ]
       cat("New <Car> built by ", private$constructor, "\n")
       private$constructorId <- constr$constructorId
-      stopifnot(fuel <= 100, fuel > 0)
+      stopifnot("<Car::initialize>\n fuel must be <= 100" = fuel <= 100,
+                "<Car::initialize>\n fuel must be > 0" = fuel > 0)
       private$start_fuel <- fuel
       private$fuel <- fuel
     },
@@ -330,20 +347,26 @@ Car <- R6::R6Class("Car",
     get_car_laptime = function() {
       return(private$fuel * 0.03 + private$damage_time_perm)
     },
-    burn_fuel = function(race_laps, rate = 1) {
+    burn_fuel = function(rate = 1) {
       # rate = 1 for most laps. 1/1.4 for VSC, 1/1.6 for SC, etc.
-      stopifnot(as.integer(race_laps) == race_laps)
-      stopifnot(race_laps > 0)
-      burnrate <- private$start_fuel / race_laps
+      stopifnot("<Car::burn_fuel>\n Must set car$set_n_laps([laps]) before buring fuel." = private$num_laps > 0)
+      burnrate <- private$start_fuel / private$num_laps
       private$fuel <- private$fuel - burnrate * rate
       invisible(self)
     },
     add_damage = function(lap) {
-      stopifnot(as.integer(lap) == lap, lap > 0)
+      stopifnot("<Car::add_damage>\n lap must be integer numeric" = as.integer(lap) == lap,
+                "<Car::add_damage>\n lap must be greater than 0" = lap > 0)
       private$is_damaged <- T
       private$damage_time_fixable <- runif(1, 2, 60)
       private$damage_time_perm <- runif(1, 0, 2)
       private$damage_lap <- lap
+      invisible(self)
+    },
+    set_n_laps = function(nlaps){
+      stopifnot("<Car::set_n_laps>\n lap must be integer numeric" = as.integer(lap) == lap,
+                "<Car::set_n_laps>\n lap must be greater than 0" = lap > 0)
+      private$num_laps <- nlaps
       invisible(self)
     }
   ),
@@ -355,10 +378,13 @@ Car <- R6::R6Class("Car",
     is_damaged = F,
     damage_time_fixable = 0,
     damage_time_perm = 0,
-    damage_lap = 0
+    damage_lap = 0,
+    num_laps = 0
   )
 )
 
+
+# ---- RACE ----
 Race <- R6::R6Class("Race",
   public = list(
     initialize = function(name, circuit, year, t_quali = 90, num_laps = 70) {
@@ -386,7 +412,8 @@ Race <- R6::R6Class("Race",
       )
     },
     add_driver = function(driver) {
-      stopifnot("Driver" %in% class(driver))
+      stopifnot("<Race::add_Driver>\n driver must be class Driver" = "Driver" %in% class(driver))
+      driver$set_n_laps(private$num_laps)
       private$drivers <- c(private$drivers, driver)
       invisible(self)
     },
@@ -448,6 +475,18 @@ Race <- R6::R6Class("Race",
     },
     get_current_lap = function() {
       return(private$current_lap)
+    },
+    get_ghost_race_time = function(){
+      if(private$ghost_time == 0){
+        private$run_ghost()
+      }
+      return(private$ghost_time)
+    },
+    get_avg_pit_duration = function() {
+      return(private$circuit$get_avg_pit_duration())
+    },
+    get_circuit = function(){
+      return(private$circuit)
     },
     run_race = function() {
       cat("<Race> Race Running not ready yet.")
@@ -544,7 +583,8 @@ Race <- R6::R6Class("Race",
     },
     run_ghost = function() {
       # strategy: s -> m (18) -> s (39)
-      ghost <- Driver$new("Ghost", grid = 1, constructor = "ghost", tire_list = "sssmmmhhh", t_driver = 0)
+      ghost <- Driver$new("ghost", grid = 1, constructor = "Ghost", tire_list = "sssmmmhhh", t_driver = 0)
+      ghost$set_n_laps(private$num_laps)
       ghost_strategy <- private$strategies[[1]]
       racetime <- 0
 
@@ -552,11 +592,11 @@ Race <- R6::R6Class("Race",
         next_stop <- ifelse(stint > ghost_strategy$get_num_pits(), private$num_laps, ghost_strategy$get_pit_laps()[stint])
         last_stop <- ifelse(stint == 1, 1, ghost_strategy$get_pit_laps()[stint - 1])
         for (lap in last_stop:next_stop) {
-          racetime <- racetime + private$t_generic + ghost$get_laptime
+          racetime <- racetime + private$t_generic + ghost$get_laptime(lap)
           ghost$add_lap()
         }
         if (stint != ghost_strategy$get_num_pits() + 1) {
-          racetime <- racetime + pit_time
+          racetime <- racetime + self$get_avg_pit_duration()
           ghost$change_tire(ghost_strategy$get_tires()[stint + 1])
         }
       }
@@ -567,6 +607,8 @@ Race <- R6::R6Class("Race",
   )
 )
 
+
+# ---- CIRCUIT ----
 Circuit <- R6::R6Class("Circuit",
   public = list(
     initialize = function(name, avg_pit_duration = 0, avg_num_pits = 0, avg_safety_cars = 0.70) {
@@ -638,11 +680,14 @@ Circuit <- R6::R6Class("Circuit",
   )
 )
 
+
+# ---- STRATEGY ----
 Status <- R6::R6Class("Status",
   public = list(
     initialize = function(status_type, lap = 0) {
       private$status_type <- match.arg(status_type, c("green", "yellow", "red", "vsc", "sc", "completed"))
-      stopifnot(as.integer(lap) == lap, lap >= 0)
+      stopifnot("<Status::initialize>\n lap must be integer" = as.integer(lap) == lap,
+                "<Status::initialize>\n lap must be >= 0" = lap >= 0)
       private$status_start <- lap
     },
     print = function(...) {
@@ -658,7 +703,8 @@ Status <- R6::R6Class("Status",
       return(private$status_start)
     },
     get_status_age = function(lap) {
-      stopifnot(as.integer(lap) == lap, lap >= 0)
+      stopifnot("<Status::get_status_age>\n lap must be integer" = as.integer(lap) == lap,
+                "<Status::get_status_age>\n lap must be >= 0" = lap >= 0)
       return(lap - private$status_start)
     }
   ),
@@ -668,12 +714,15 @@ Status <- R6::R6Class("Status",
   )
 )
 
+
+# ---- SAFETY CAR ----
 SafetyCar <- R6::R6Class("SafetyCar",
   public = list(
     initialize = function(start_time, length, driver, type) {
-      stopifnot(is.numeric(start_time))
+      stopifnot("<SafetyCar::initialize>\n start_time must be numeric" = is.numeric(start_time))
       private$start_time <- start_time
-      stopifnot(as.integer(length) == length)
+      stopifnot("<SafetyCar::initialize>\n length must be integer number of laps" = as.integer(length) == length)
+      stopifnot("<SafetyCar::initialize>\n length must be greater than 0 laps" = length > 0)
       private$length <- length
       private$type <- match.arg(type, c("sc", "vsc"))
       stopifnot("Driver" %in% class(driver))
@@ -697,6 +746,8 @@ SafetyCar <- R6::R6Class("SafetyCar",
 )
 
 
+
+# ---- STRATEGY ----
 Strategy <- R6::R6Class("Strategy",
   public = list(
     initialize = function(strategy) {
@@ -705,11 +756,11 @@ Strategy <- R6::R6Class("Strategy",
       numsplit <- unlist(strsplit(split = "\\D", x = strategy))
       numsplit <- as.numeric(numsplit[numsplit != ""])
       # more tires than pit laps
-      stopifnot(length(chrsplit) == length(numsplit) + 1)
+      stopifnot("<Strategy::initialize>\n must have more ties than pit laps provided" = length(chrsplit) == length(numsplit) + 1)
       # all tires in list of possible tires
-      stopifnot(all(chrsplit %in% c("s", "m", "h", "i", "w")))
+      stopifnot("<Strategy::initialize>\n tires must be one of s, m, h, i, w" = all(chrsplit %in% c("s", "m", "h", "i", "w")))
       # make sure stops are in increasing order
-      stopifnot(all(numsplit[order(numsplit)] == numsplit))
+      stopifnot("<Strategy::initialize>\n pit stops must be provided in numerical order" = all(numsplit[order(numsplit)] == numsplit))
 
       private$pitlaps <- numsplit
       private$tires <- chrsplit
