@@ -15,6 +15,7 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
+#Race$debug("get_sc_vsc")
 bahrain2022<-Race$new("Bahraini Grand Pirx", "Bahrain", 2022, 90.558, 57)
 
 bahrain2022$add_driver(Driver$new("leclerc", 1, 'Ferrari', 'ssssmh',0.001))
@@ -41,17 +42,23 @@ bahrain2022$add_driver(Driver$new("latifi", 20, 'Williams', 'ssssmmh',3.076))
 bahrain2022$add_strategy("s19m40s")
 bahrain2022$add_strategy("s18h42s")
 bahrain2022$add_strategy("s16h37m")
+bahrain2022$get_ghost_race_time()
 ```
 
 Verify it's all there
 ```{r verify}
 bahrain2022
 ```
+Find the SC/VSCs
 
+```{r scvsc}
+bahrain2022$get_sc_vsc()
+```
 ## Tire Model
 
 Here's a tire model plot:
 ```{r tire_model, warnings = FALSE}
 leclerc<-bahrain2022$get_drivers_obj()[[1]]
-leclerc$get_tire_plot()
+#debug(leclerc$get_tire_plot)
+leclerc$get_tire_plot(75)
 ```
