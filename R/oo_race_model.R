@@ -88,8 +88,8 @@ Driver <- R6::R6Class("Driver",
       private$t_driver <- t_driver
       private$strategy <- substring(tire_list, 1, 1)
       for (t in unlist(strsplit(tire_list, ""))) {
-        if(t == toupper(t)){
-          #different aged tire
+        if (t == toupper(t)) {
+          # different aged tire
           NA
         }
         newtire <- Tire$new(as.character(t))
@@ -240,28 +240,40 @@ Driver <- R6::R6Class("Driver",
       private$num_laps <- nlaps
       invisible(self)
     },
-    get_crash_rate = function(){
+    get_crash_rate = function() {
       return(private$crash_rate)
     },
-    get_car_failure_rate = function(){
+    get_car_failure_rate = function() {
       return(private$car$get_failure_rate())
     },
     get_tire_plot = function(nlaps = 75) {
-      tt<-Vectorize(function(age, k1, k2, k3, k4, k5){
-        return(log(age*k1 + 1) * k2 + k3 + k4 * (1 + k5)^(age-1))
-      }, vectorize.args = 'age',)
-      laps <- tibble(lap = c(0:nlaps), soft = NA, medium = NA, hard = NA,
-        intermediate = NA, wet = NA)
-      laps$soft <- tt(age = c(0:nlaps), private$tire_params[[1, 2]], private$tire_params[[1, 3]], private$tire_params[[1, 4]],
-        private$tire_params[[1, 5]], private$tire_params[[1, 6]])
-      laps$medium <- tt(age = c(0:nlaps), private$tire_params[[2, 2]], private$tire_params[[2, 3]], private$tire_params[[2, 4]],
-        private$tire_params[[2, 5]], private$tire_params[[2, 6]])
-      laps$hard <- tt(age = c(0:nlaps), private$tire_params[[3, 2]], private$tire_params[[3, 3]], private$tire_params[[3, 4]],
-        private$tire_params[[3, 5]], private$tire_params[[3, 6]])
-      laps$intermediate <- tt(age = c(0:nlaps), private$tire_params[[4, 2]], private$tire_params[[4, 3]], private$tire_params[[4, 4]],
-        private$tire_params[[4, 5]], private$tire_params[[4, 6]])
-      laps$wet <- tt(age = c(0:nlaps), private$tire_params[[5, 2]], private$tire_params[[5, 3]], private$tire_params[[5, 4]],
-        private$tire_params[[5, 5]], private$tire_params[[5, 6]])
+      tt <- Vectorize(function(age, k1, k2, k3, k4, k5) {
+        return(log(age * k1 + 1) * k2 + k3 + k4 * (1 + k5)^(age - 1))
+      }, vectorize.args = "age", )
+      laps <- tibble(
+        lap = c(0:nlaps), soft = NA, medium = NA, hard = NA,
+        intermediate = NA, wet = NA
+      )
+      laps$soft <- tt(
+        age = c(0:nlaps), private$tire_params[[1, 2]], private$tire_params[[1, 3]], private$tire_params[[1, 4]],
+        private$tire_params[[1, 5]], private$tire_params[[1, 6]]
+      )
+      laps$medium <- tt(
+        age = c(0:nlaps), private$tire_params[[2, 2]], private$tire_params[[2, 3]], private$tire_params[[2, 4]],
+        private$tire_params[[2, 5]], private$tire_params[[2, 6]]
+      )
+      laps$hard <- tt(
+        age = c(0:nlaps), private$tire_params[[3, 2]], private$tire_params[[3, 3]], private$tire_params[[3, 4]],
+        private$tire_params[[3, 5]], private$tire_params[[3, 6]]
+      )
+      laps$intermediate <- tt(
+        age = c(0:nlaps), private$tire_params[[4, 2]], private$tire_params[[4, 3]], private$tire_params[[4, 4]],
+        private$tire_params[[4, 5]], private$tire_params[[4, 6]]
+      )
+      laps$wet <- tt(
+        age = c(0:nlaps), private$tire_params[[5, 2]], private$tire_params[[5, 3]], private$tire_params[[5, 4]],
+        private$tire_params[[5, 5]], private$tire_params[[5, 6]]
+      )
 
       laps <- laps %>% pivot_longer(soft:wet, names_to = "tire", values_to = "laptime")
 
@@ -351,7 +363,7 @@ Car <- R6::R6Class("Car",
     get_car_laptime = function() {
       return(private$fuel * 0.03 + private$damage_time_perm)
     },
-    get_failure_rate = function(){
+    get_failure_rate = function() {
       return(private$failure_rate)
     },
     burn_fuel = function(rate = 1) {
@@ -494,8 +506,8 @@ Race <- R6::R6Class("Race",
       }
       return(private$ghost_time)
     },
-    get_sc_vsc = function(){
-      if(!private$sc_vsc_determined){
+    get_sc_vsc = function() {
+      if (!private$sc_vsc_determined) {
         private$determine_sc()
       }
       return(private$sc_vsc)
@@ -599,8 +611,8 @@ Race <- R6::R6Class("Race",
 
       # set laptimes per driver - remember adjusted for aboves.
 
-      #TODO: update current time to time when leader finishes lap
-      #private$current_time <- 0
+      # TODO: update current time to time when leader finishes lap
+      # private$current_time <- 0
       invisible(self)
     },
     run_ghost = function() {
@@ -626,36 +638,36 @@ Race <- R6::R6Class("Race",
       private$ghost_time <- racetime
       invisible(self)
     },
-    determine_sc = function(){
-      if (private$ghost_time == 0){
+    determine_sc = function() {
+      if (private$ghost_time == 0) {
         private$run_ghost()
       }
-      n_sc<-rpois(1, private$circuit$get_avg_num_safety_cars())
-      sc<-c()
+      n_sc <- rpois(1, private$circuit$get_avg_num_safety_cars())
+      sc <- c()
       sc_laps <- c()
       sc_drivers <- c()
-      if(n_sc != 0){
-        #for n in n_sc
-        #pick a lap, pick a length, pick a crashed driver
-        for (i in 1:n_sc){
+      if (n_sc != 0) {
+        # for n in n_sc
+        # pick a lap, pick a length, pick a crashed driver
+        for (i in 1:n_sc) {
           lap <- NA
-          while (is.na(lap)){
+          while (is.na(lap)) {
             lap <- sample(c(1, 2), 1, prob = private$sc_distribution)
-            if(lap == 2){
+            if (lap == 2) {
               lap <- sample(c(2:private$num_laps), 1)
             }
-            if (lap %in% sc_laps){
+            if (lap %in% sc_laps) {
               lap <- NA
             }
           }
-          start_time <- (lap-1)*private$t_generic + runif(1, min = 0, max = private$t_generic)
+          start_time <- (lap - 1) * private$t_generic + runif(1, min = 0, max = private$t_generic)
           lngth <- sample(c(1:8), 1, prob = private$sc_length)
           sc_laps <- c(sc_laps, lap:(lap + lngth))
           driver <- NA
-          while(is.na(driver)){
-            crash_rates<-sapply(private$drivers, function(x) x$get_crash_rate())
+          while (is.na(driver)) {
+            crash_rates <- sapply(private$drivers, function(x) x$get_crash_rate())
             driver <- sample(1:length(private$drivers), 1, prob = crash_rates)
-            if(driver %in% sc_drivers){
+            if (driver %in% sc_drivers) {
               driver <- NA
             }
           }
@@ -665,32 +677,32 @@ Race <- R6::R6Class("Race",
       }
 
       vsc <- c()
-      #tabulate driver failures
-      #except for drivers in SC
-      if(length(sc_drivers) > 0){
-        remaining_drivers<-private$drivers[-sc_drivers]
+      # tabulate driver failures
+      # except for drivers in SC
+      if (length(sc_drivers) > 0) {
+        remaining_drivers <- private$drivers[-sc_drivers]
       } else {
-        remaining_drivers<-private$drivers
+        remaining_drivers <- private$drivers
       }
       failure_rates <- sapply(remaining_drivers, function(x) x$get_car_failure_rate())
       driver_fails <- sapply(failure_rates, function(x) x > runif(1))
-      if(sum(driver_fails) > 0){
-        for(d in which(driver_fails)){
-          driver<-remaining_drivers[[d]]
-          lngth<-sample(1:4, 1, prob = private$vsc_length)
+      if (sum(driver_fails) > 0) {
+        for (d in which(driver_fails)) {
+          driver <- remaining_drivers[[d]]
+          lngth <- sample(1:4, 1, prob = private$vsc_length)
           # a zero lenght vsc just tracks driver failures
           lngth <- ifelse(private$p_vsc_fail > runif(1), lngth, 0)
           time <- runif(1, 1, private$ghost_time)
-          vsc<-c(vsc, SafetyCar$new(start_time = time, length = lngth, driver = driver, type = 'vsc'))
+          vsc <- c(vsc, SafetyCar$new(start_time = time, length = lngth, driver = driver, type = "vsc"))
         }
       }
 
-      #combine sc & vsc then order by start time
-      sc_vsc<-c(sc, vsc)
-      if(length(sc_vsc) > 0){
-        sc_vsc_start_times<-sapply(sc_vsc, function(x) x$get_start_time())
+      # combine sc & vsc then order by start time
+      sc_vsc <- c(sc, vsc)
+      if (length(sc_vsc) > 0) {
+        sc_vsc_start_times <- sapply(sc_vsc, function(x) x$get_start_time())
 
-        private$sc_vsc<-sc_vsc[order(sc_vsc_start_times)]
+        private$sc_vsc <- sc_vsc[order(sc_vsc_start_times)]
         private$sc_vsc_start_times <- sc_vsc_start_times[order(sc_vsc_start_times)]
       }
       private$sc_vsc_determined <- TRUE
@@ -754,7 +766,7 @@ Circuit <- R6::R6Class("Circuit",
     get_avg_num_pits = function() {
       return(private$avg_num_pits)
     },
-    get_avg_num_safety_cars = function(){
+    get_avg_num_safety_cars = function() {
       return(private$avg_safety_cars)
     }
   ),
@@ -835,16 +847,16 @@ SafetyCar <- R6::R6Class("SafetyCar",
         sep = ""
       )
     },
-    get_start_time = function(){
+    get_start_time = function() {
       return(private$start_time)
     },
-    get_length = function(){
+    get_length = function() {
       return(private$length)
     },
-    get_driver = function(){
+    get_driver = function() {
       return(private$driver)
     },
-    get_type = function(){
+    get_type = function() {
       return(private$type)
     }
   ),
